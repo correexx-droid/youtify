@@ -1,0 +1,38 @@
+# Builds the iPhone app as an unsigned .ipa for sideloading (Sideloadly, AltStore, SideStore, TrollStore).
+# Runs on every push to main and by hand (Actions → iOS app → Run workflow). The .ipa is attached to the run as
+# the "YoutiFy-iOS" artifact.
+name: iOS app
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ios:
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @musike/mobile ipa
+      - name: Check the .ipa
+        shell: bash
+        run: |
+          ls -l release
+          found=$(ls release/*-iOS.ipa 2>/dev/null | wc -l)
+          [ "$found" -eq 1 ] || { echo "::error::No .ipa was built"; exit 1; }
+      - uses: actions/upload-artifact@v7
+        with:
+          name: YoutiFy-iOS
+          path: release/*-iOS.ipa
+          if-no-files-found: error
+          retention-days: 30
