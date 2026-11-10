@@ -40,6 +40,32 @@ export function parseLink(raw: string): { kind: "youtube"; id: string } | { kind
   }
 }
 
+/** "3:55" or "1:02:03" → seconds. */
+function clock(v: string): number {
+  if (!/^\d+(:\d{1,2}){1,2}$/.test(v)) return 0;
+  return v.split(":").reduce((sum, part) => sum * 60 + Number(part), 0);
+}
+
+/** YouTube's newer playlist rows ("LockupView") carry the video id, title, channel and length in other places. */
+function lockupTrack(item: any): Track | null {
+  if (item?.type !== "LockupView" || item.content_type !== "VIDEO") return null;
+  const id = String(item.content_id ?? "");
+  if (!/^[\w-]{11}$/.test(id)) return null;
+  const rows: any[] = item.metadata?.metadata?.metadata_rows ?? [];
+  const artist = text(rows[0]?.metadata_parts?.[0]?.text?.text).replace(/\s*-\s*Topic$/i, "");
+  const badges: any[] = (item.content_image?.overlays ?? []).flatMap((o: any) => o?.badges ?? []);
+  const duration = badges.map((b) => clock(text(b?.text))).find((n) => n > 0) ?? 0;
+  return {
+    id,
+    title: text(item.metadata?.title?.text ?? item.metadata?.title) || "Untitled",
+    artist,
+    duration,
+    thumb: `https://i.ytimg.com/vi/${id}/mqdefault.jpg`,
+    art: `https://i.ytimg.com/vi/${id}/hq720.jpg`,
+    kind: "video",
+  };
+}
+
 async function youtubePlaylist(id: string, lang: Lang): Promise<LinkImport> {
   return withClient(async (yt) => {
     let page: any = await yt.getPlaylist(id);
@@ -48,7 +74,7 @@ async function youtubePlaylist(id: string, lang: Lang): Promise<LinkImport> {
     const tracks: Track[] = [];
     for (let round = 0; round < 30; round++) {
       for (const item of page?.items ?? page?.videos ?? []) {
-        const track = toTrack(item, "song");
+        const track = lockupTrack(item) ?? toTrack(item, "song");
         if (track && !seen.has(track.id)) {
           seen.add(track.id);
           tracks.push(track);
