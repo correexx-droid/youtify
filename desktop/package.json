@@ -19,7 +19,7 @@
   "build": {
     "appId": "app.musike.desktop",
     "productName": "YoutiFy",
-    "copyright": "Musike",
+    "copyright": "YoutiFy",
     "directories": {
       "output": "out",
       "buildResources": "build"

@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { app, BrowserWindow, ipcMain, Menu, screen, shell } from "electron";
@@ -21,6 +21,7 @@ if (!app.requestSingleInstanceLock()) {
 // The app was called Musike before the YoutiFy redesign: keep using that data folder so the library stays put.
 app.setPath("userData", path.join(app.getPath("appData"), "Musike"));
 const userData = app.getPath("userData");
+mkdirSync(userData, { recursive: true });
 process.env.MUSIKE_DATA_DIR = path.join(userData, "data");
 process.env.MUSIKE_CACHE_DIR = path.join(userData, "cache");
 process.env.MUSIKE_BIN_DIR = path.join(userData, "bin");
