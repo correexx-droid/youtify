@@ -24,7 +24,7 @@ export function parseList(text: string): string[] {
     .split(/[,\n]+/)
     .map((s) => s.trim())
     .filter((s) => {
-      const key = s.toLocaleLowerCase("pt-BR");
+      const key = s.toLocaleLowerCase();
       if (!s || seen.has(key)) return false;
       seen.add(key);
       return true;

@@ -139,15 +139,15 @@
           retry: "Try again",
           names: { "yt-dlp": "yt-dlp (YouTube search)", deno: "Deno (YouTube challenges)", ffmpeg: "FFmpeg (HD video)" },
         },
-        "pt-BR": {
-          starting: "Iniciando",
-          downloading: "Baixando componentes na primeira execução",
-          ready: "pronto",
-          extracting: "extraindo",
-          of: (got, total) => `${got} de ${total} MB`,
-          failed: "Não foi possível iniciar: ",
-          retry: "Tentar de novo",
-          names: { "yt-dlp": "yt-dlp (busca no YouTube)", deno: "Deno (desafios do YouTube)", ffmpeg: "FFmpeg (vídeo HD)" },
+        de: {
+          starting: "Startet",
+          downloading: "Komponenten werden beim ersten Start geladen",
+          ready: "bereit",
+          extracting: "wird entpackt",
+          of: (got, total) => `${got} von ${total} MB`,
+          failed: "Start nicht möglich: ",
+          retry: "Erneut versuchen",
+          names: { "yt-dlp": "yt-dlp (YouTube-Suche)", deno: "Deno (YouTube-Prüfungen)", ffmpeg: "FFmpeg (HD-Video)" },
         },
       };
       const lang = new URLSearchParams(location.search).get("lang");

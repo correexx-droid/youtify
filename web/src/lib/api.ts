@@ -4,12 +4,14 @@ import {
   type Channel,
   type ErrorCode,
   type ImportResult,
+  type LinkImport,
   type MusikeApi,
   type Prepared,
   type SystemInfo,
   type SystemJob,
   type SystemMedia,
 } from "./apiTypes";
+import { downloadInChunks, totalFromContentRange } from "./chunked";
 import type { AlbumCard, AlbumPage, ArtistPage, Genre, GenreArtist, GenrePage, Library, Playlist, Track } from "./types";
 
 // The HTTP backend: the Musike server (web app, desktop app). The Android build swaps this module for native/api.ts.
@@ -47,6 +49,7 @@ export const api: MusikeApi = {
     request<{ artists: GenreArtist[]; hasMore: boolean }>(`/api/genres/${encodeURIComponent(id)}/artists?offset=${offset}`),
   artist: (id: string, signal?: AbortSignal) => request<ArtistPage>(`/api/artists/${encodeURIComponent(id)}`, { signal }),
   album: (id: string, signal?: AbortSignal) => request<AlbumPage>(`/api/albums/${encodeURIComponent(id)}`, { signal }),
+  readPlaylistLink: (url: string) => request<LinkImport>(`/api/import-link?url=${encodeURIComponent(url)}`),
   searchAlbums: (q: string, signal?: AbortSignal) =>
     request<{ albums: AlbumCard[] }>(`/api/search/albums?q=${encodeURIComponent(q)}`, { signal }).then((r) => r.albums),
   /** The music video matching a song, or null when YouTube has none. */
@@ -84,6 +87,23 @@ export const api: MusikeApi = {
 /** What a media element plays for a track: here, the server's stream proxy. The Android backend resolves it on the phone. */
 export const streamSource = (id: string, kind: "audio" | "video", quality: "sd" | "hd"): string | Promise<string> =>
   kind === "audio" ? `/api/stream/${id}/audio` : `/api/stream/${id}/video?q=${quality}`;
+
+/** The whole audio of a track, for offline listening (through the server's stream proxy, in ranged pieces). */
+export function downloadAudio(id: string, onProgress?: (done: number, total: number | null) => void) {
+  return downloadInChunks(async (start, end) => {
+    const res = await fetch(`/api/stream/${id}/audio`, { headers: { Range: `bytes=${start}-${end}`, [LANG_HEADER]: getLang() } });
+    if (!res.ok && res.status !== 416) {
+      const body = await res.json().catch(() => ({}));
+      throw new ApiError(res.status, body.error ?? getT().player.httpError(res.status), body.code);
+    }
+    return {
+      status: res.status,
+      bytes: new Uint8Array(await res.arrayBuffer()),
+      total: totalFromContentRange(res.headers.get("content-range")) ?? (res.status === 200 ? Number(res.headers.get("content-length")) || null : null),
+      mime: (res.headers.get("content-type") ?? "audio/mp4").split(";")[0]!,
+    };
+  }, onProgress);
+}
 
 /** Saves a text file the way this platform does it: a browser download (the desktop app shows "Save as"). */
 export async function saveFile(name: string, text: string) {

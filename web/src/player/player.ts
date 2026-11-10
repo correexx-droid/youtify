@@ -5,6 +5,7 @@ import { createAudio } from "../lib/audio";
 import { shuffled } from "../lib/format";
 import type { Track } from "../lib/types";
 import { useLibrary } from "../stores/library";
+import { isOffline, offlineUrl } from "../stores/offline";
 import { openSettings } from "../stores/system";
 import { toast } from "../stores/ui";
 
@@ -205,8 +206,13 @@ export const usePlayer = create<PlayerState>((set, get) => {
       media.src = src;
       if (autoplay) play(media);
     };
-    // The server's proxy URL is known right away; on Android the stream is first resolved on the phone.
-    const source = streamSource(mediaIdFor(track, kind), kind, s.quality);
+    // Downloaded songs play from the device (decompressed in memory), falling back to the stream if that fails.
+    // Otherwise the server's proxy URL is known right away; on Android the stream is first resolved on the phone.
+    const online = () => streamSource(mediaIdFor(track, kind), kind, s.quality);
+    const source =
+      kind === "audio" && isOffline(track.id)
+        ? offlineUrl(track.id).then((url) => url ?? online())
+        : online();
     if (typeof source === "string") start(source);
     else {
       const mine = token;

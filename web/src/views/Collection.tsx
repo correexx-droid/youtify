@@ -6,7 +6,9 @@ import { NamePlaylistDialog } from "../components/Dialogs";
 import { IconButton, PlayDisc } from "../components/IconButton";
 import { Modal } from "../components/Modal";
 import { EmptyState, PageHeader } from "../components/Page";
+import { DownloadButton } from "../components/Offline";
 import { TrackList } from "../components/TrackList";
+import { pinKeyFor } from "../stores/offline";
 import { useT } from "../i18n";
 import { shuffled } from "../lib/format";
 import { paths } from "../lib/routes";
@@ -106,6 +108,9 @@ export default function Collection({ kind }: Props) {
         >
           <ShuffleIcon size={24} />
         </IconButton>
+        {kind !== "history" && pinKeyFor(kind, playlist?.id) && (
+          <DownloadButton pinKey={pinKeyFor(kind, playlist?.id)!} name={name} tracks={tracks} />
+        )}
         {kind === "playlist" && (
           <IconButton label={t.collection.more} size="lg" onClick={() => setMoreOpen(true)}>
             <DotsThreeIcon size={26} weight="bold" />

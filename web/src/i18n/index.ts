@@ -1,23 +1,23 @@
 import { create } from "zustand";
 import { desktop } from "../lib/desktop";
 import { en, type Messages } from "./en";
-import { pt } from "./pt";
+import { de } from "./de";
 
 export type { Messages };
-export type Lang = "en" | "pt-BR";
+export type Lang = "en" | "de";
 
 /** Each language named in itself, as language pickers do. */
 export const LANGUAGES: { id: Lang; name: string }[] = [
   { id: "en", name: "English" },
-  { id: "pt-BR", name: "Português (Brasil)" },
+  { id: "de", name: "Deutsch" },
 ];
 
-const MESSAGES: Record<Lang, Messages> = { en, "pt-BR": pt };
+const MESSAGES: Record<Lang, Messages> = { en, de };
 const KEY = "musike:lang";
 
-export const isLang = (v: unknown): v is Lang => v === "en" || v === "pt-BR";
+export const isLang = (v: unknown): v is Lang => v === "en" || v === "de";
 
-/** Musike speaks English until the user picks another language in Settings. */
+/** The language picked in Settings; otherwise German on German-speaking devices, English elsewhere. */
 function readLang(): Lang {
   try {
     const saved = localStorage.getItem(KEY);
@@ -25,7 +25,7 @@ function readLang(): Lang {
   } catch {
     /* private mode */
   }
-  return "en";
+  return navigator.language?.toLowerCase().startsWith("de") ? "de" : "en";
 }
 
 function apply(lang: Lang) {

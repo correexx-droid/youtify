@@ -110,7 +110,7 @@
       "uninstallerIcon": "build/icon.ico",
       "installerLanguages": [
         "en_US",
-        "pt_BR"
+        "de_DE"
       ],
       "language": "1033",
       "deleteAppDataOnUninstall": false,

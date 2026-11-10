@@ -1,3 +1,4 @@
+import { readPlaylistLink } from "./importLink.js";
 import { existsSync } from "node:fs";
 import { createServer } from "node:net";
 import fastifyStatic from "@fastify/static";
@@ -114,6 +115,12 @@ export async function startServer(opts: StartOptions = {}): Promise<RunningServe
   app.get("/api/search/albums", async (req) => {
     const { q } = req.query as { q?: string };
     return { albums: await searchAlbums(query(q), langOf(req)) };
+  });
+
+  /** A Spotify or YouTube playlist link, read so it can be copied into a new playlist. */
+  app.get("/api/import-link", async (req) => {
+    const { url } = req.query as { url?: string };
+    return readPlaylistLink((url ?? "").slice(0, 500), langOf(req));
   });
 
   /** The music video for a song, so "Vídeo" mode can show the clip instead of a still cover. */

@@ -113,7 +113,7 @@ function uniqueTracks(tracks: (Track | null)[]): Track[] {
   const seen = new Set<string>();
   return tracks.filter((t): t is Track => {
     if (!t) return false;
-    const key = `${t.title}|${t.artist}`.toLocaleLowerCase("pt-BR");
+    const key = `${t.title}|${t.artist}`.toLocaleLowerCase();
     if (seen.has(t.id) || seen.has(key)) return false;
     seen.add(t.id);
     seen.add(key);

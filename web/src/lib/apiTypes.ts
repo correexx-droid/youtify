@@ -1,3 +1,8 @@
+export type LinkQuery = { title: string; artist: string; duration: number };
+export type LinkImport =
+  | { source: "youtube"; name: string; tracks: import("./types").Track[] }
+  | { source: "spotify"; name: string; queries: LinkQuery[] };
+
 import type { AlbumCard, AlbumPage, ArtistPage, Genre, GenreArtist, GenrePage, Library, Playlist, Track } from "./types";
 
 /**
@@ -75,6 +80,8 @@ export interface MusikeApi {
   artist(id: string, signal?: AbortSignal): Promise<ArtistPage>;
   album(id: string, signal?: AbortSignal): Promise<AlbumPage>;
   searchAlbums(q: string, signal?: AbortSignal): Promise<AlbumCard[]>;
+  /** Reads a Spotify or YouTube playlist link (YouTube: its tracks; Spotify: titles to look up). */
+  readPlaylistLink(url: string): Promise<LinkImport>;
   /** The music video matching a song, or null when YouTube has none. */
   videoFor(t: Track): Promise<Track | null>;
   prepare(id: string, signal?: AbortSignal): Promise<Prepared>;

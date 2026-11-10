@@ -9,6 +9,7 @@ import { useLibrary } from "../stores/library";
 import { useUi } from "../stores/ui";
 import { Artwork } from "./Artwork";
 import { Equalizer } from "./Brand";
+import { OfflineMark } from "./Offline";
 
 interface RowProps {
   track: Track;
@@ -69,6 +70,7 @@ const TrackRow = memo(function TrackRow({ track, position, onPlay, playlistId, s
           {track.title}
         </p>
         <p className="mt-0.5 flex items-center gap-1.5 truncate text-[13px] text-fg-2">
+          <OfflineMark id={track.id} />
           {track.kind === "video" && <VideoCameraIcon size={13} className="shrink-0 text-fg-3" aria-label={t.common.video} />}
           <span className="truncate">{track.artist || t.common.youtube}</span>
         </p>

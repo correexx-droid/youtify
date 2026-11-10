@@ -1,3 +1,4 @@
+import { CapacitorHttp } from "@capacitor/core";
 import { Directory, Encoding, Filesystem } from "@capacitor/filesystem";
 import { Share } from "@capacitor/share";
 import {
@@ -12,11 +13,13 @@ import {
   searchAlbums,
 } from "../../../server/src/browse";
 import { msg, tr, type MsgKey } from "../../../server/src/i18n";
+import { readPlaylistLink } from "../../../server/src/importLink";
 import * as library from "../../../server/src/library";
 import { findVideoFor, radio, search, suggestions } from "../../../server/src/search";
 import { HttpError, VIDEO_ID } from "../../../server/src/types";
 import { getLang, getT } from "../i18n";
 import { ApiError, type MusikeApi, type SystemInfo } from "../lib/apiTypes";
+import { downloadInChunks, totalFromContentRange } from "../lib/chunked";
 import "./android";
 import { media } from "./media";
 import { nativeStorage } from "./storage";
@@ -80,6 +83,7 @@ export const api: MusikeApi = {
       if (!ALBUM_ID.test(id)) throw fail(400, "invalidAlbum");
       return albumPage(id, getLang());
     }, signal),
+  readPlaylistLink: (url) => call(() => readPlaylistLink(url.slice(0, 500), getLang())),
   searchAlbums: (q, signal) => call(() => searchAlbums(q.trim().slice(0, 200), getLang()), signal),
   videoFor: (t) => call(() => findVideoFor(t.id, t.title, t.artist, t.duration)),
   prepare: (id, signal) =>
@@ -115,6 +119,49 @@ export const api: MusikeApi = {
 
 /** On the phone, the media element plays YouTube's stream directly: resolved here, no proxy needed. */
 export const streamSource = (id: string): Promise<string> => resolveAudio(id).then((r) => r.url);
+
+function base64Bytes(b64: string): Uint8Array {
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
+const header = (h: Record<string, string> | undefined, name: string) =>
+  Object.entries(h ?? {}).find(([k]) => k.toLowerCase() === name)?.[1];
+
+/**
+ * The whole audio of a track, for offline listening. Straight from YouTube through Android's HTTP stack (the
+ * WebView's fetch is blocked cross-origin), in ranged pieces like the player's own requests.
+ */
+export async function downloadAudio(id: string, onProgress?: (done: number, total: number | null) => void) {
+  let resolved = await resolveAudio(id);
+  let refreshed = false;
+  return downloadInChunks(async (start, end) => {
+    const get = () =>
+      CapacitorHttp.request({
+        url: resolved.url,
+        method: "GET",
+        headers: { Range: `bytes=${start}-${end}`, "User-Agent": navigator.userAgent },
+        responseType: "arraybuffer",
+      });
+    let res = await get();
+    // An expired or refused URL: resolve a fresh one once and carry on where we were.
+    if ((res.status === 403 || res.status === 410) && !refreshed) {
+      refreshed = true;
+      forgetUrl(resolved.url);
+      resolved = await resolveAudio(id);
+      res = await get();
+    }
+    const data = typeof res.data === "string" ? base64Bytes(res.data) : new Uint8Array(res.data as ArrayBuffer);
+    return {
+      status: res.status,
+      bytes: res.status === 200 || res.status === 206 ? data : new Uint8Array(0),
+      total: totalFromContentRange(header(res.headers, "content-range")),
+      mime: (header(res.headers, "content-type") ?? resolved.mime ?? "audio/mp4").split(";")[0]!,
+    };
+  }, onProgress);
+}
 
 export async function explainStreamError(url: string): Promise<{ message: string }> {
   forgetUrl(url);

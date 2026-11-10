@@ -3,7 +3,7 @@
  * They are kept as keys and translated when sent, so each device gets its own language.
  */
 
-export type Lang = "en" | "pt-BR";
+export type Lang = "en" | "de";
 type Params = Record<string, string | number>;
 
 const en = {
@@ -53,60 +53,66 @@ const en = {
   toolMissing: "{tool} wasn't found on this computer.",
   downloadFailed: "Downloading {tool} failed (HTTP {status}).",
   ffmpegPackage: "Unexpected FFmpeg package.",
+  importBadLink: "That isn't a Spotify or YouTube playlist link.",
+  importFailed: "Couldn't read this playlist. Is it public?",
+  importEmpty: "No tracks found in this playlist.",
 };
 
 export type MsgKey = keyof typeof en;
 
-const pt: Record<MsgKey, string> = {
-  invalidVideoId: "ID de vídeo inválido.",
-  emptyQuery: "Digite algo para buscar.",
-  searchFailed: "A busca está indisponível agora ({detail}). Tente de novo em instantes.",
-  missingTitle: "Informe o título da música.",
-  notBackup: "Este arquivo não é um backup do YoutiFy.",
-  newerBackup: "Backup de uma versão mais nova do YoutiFy. Atualize o app para importar.",
-  idMismatch: "ID não confere.",
-  tracksRequired: "Envie uma lista de faixas.",
-  invalidGenre: "Gênero inválido.",
-  invalidOffset: "Posição inválida.",
-  invalidArtist: "Artista inválido.",
-  routeNotFound: "Rota não encontrada.",
-  noFreePort: "Nenhuma porta livre entre {from} e {to}.",
-  invalidTrack: "Faixa inválida.",
-  playlistNotFound: "Playlist não encontrada.",
-  playlistNameRequired: "Dê um nome à playlist.",
-  genresUnavailable: "Não foi possível carregar os gêneros agora. Tente de novo.",
-  genreUnavailable: "Não foi possível abrir este gênero agora. Tente de novo.",
-  genreEmpty: "Nada encontrado para este gênero.",
-  artistUnavailable: "Não foi possível abrir este artista agora. Tente de novo.",
-  artistNotFound: "Artista não encontrado.",
-  albumUnavailable: "Não foi possível abrir este álbum agora. Tente de novo.",
-  albumNotFound: "Álbum não encontrado.",
-  invalidAlbum: "Álbum inválido.",
-  ytdlpMissing: "O yt-dlp não foi encontrado neste computador. Abra Ajustes no YoutiFy para instalar.",
-  ytdlpTimeout: "O yt-dlp demorou demais para responder.",
-  ytdlpCantRun: "Não foi possível executar o yt-dlp ({error}). Abra Ajustes no YoutiFy.",
-  botCheck: "O YouTube está pedindo para esta conexão provar que não é um robô. Se estiver usando VPN, desligue e tente de novo.",
-  videoUnavailable: "Vídeo indisponível no YouTube.",
-  ageRestricted: "Vídeo com restrição de idade. Requer cookies de uma conta logada.",
-  ytdlpFailed: "Falha no yt-dlp.",
-  ytdlpOutdated: "{detail} O YouTube pode ter mudado: atualize o yt-dlp em Ajustes.",
-  noAudio: "Nenhum formato de áudio disponível para este vídeo.",
-  noSdVideo: "Este vídeo não tem versão SD combinada. Use HD.",
-  streamRefused: "O YouTube recusou o stream (HTTP {status}). Tente atualizar o yt-dlp em Ajustes.",
-  noWinget: "yt-dlp não encontrado e o winget não está disponível. Instale manualmente: https://github.com/yt-dlp/yt-dlp",
-  installingYtdlp: "Instalando yt-dlp",
-  updatingYtdlp: "Atualizando yt-dlp",
-  directUpdateFailed: "Atualização direta falhou, tentando pelo winget",
-  downloadingTools: "Baixando yt-dlp e Deno do GitHub",
-  alreadyLatest: "Já está na versão mais recente ({version})",
-  ytdlpReady: "yt-dlp {version} pronto para uso",
-  updateFailed: "Não foi possível atualizar o yt-dlp.",
-  toolMissing: "{tool} não encontrado neste computador.",
-  downloadFailed: "Download de {tool} falhou (HTTP {status}).",
-  ffmpegPackage: "Pacote do FFmpeg inesperado.",
+const de: Record<MsgKey, string> = {
+  invalidVideoId: "Ungültige Video-ID.",
+  emptyQuery: "Gib etwas ein, um zu suchen.",
+  searchFailed: "Die Suche ist gerade nicht verfügbar ({detail}). Versuch es gleich noch einmal.",
+  missingTitle: "Gib den Titel des Songs an.",
+  notBackup: "Diese Datei ist kein YoutiFy-Backup.",
+  newerBackup: "Dieses Backup stammt von einer neueren YoutiFy-Version. Aktualisiere die App, um es zu importieren.",
+  idMismatch: "Die ID stimmt nicht überein.",
+  tracksRequired: "Schick eine Liste von Titeln.",
+  invalidGenre: "Ungültiges Genre.",
+  invalidOffset: "Ungültige Position.",
+  invalidArtist: "Ungültiger Künstler.",
+  routeNotFound: "Route nicht gefunden.",
+  noFreePort: "Kein freier Port zwischen {from} und {to}.",
+  invalidTrack: "Ungültiger Titel.",
+  playlistNotFound: "Playlist nicht gefunden.",
+  playlistNameRequired: "Gib der Playlist einen Namen.",
+  genresUnavailable: "Die Genres konnten gerade nicht geladen werden. Versuch es noch einmal.",
+  genreUnavailable: "Dieses Genre konnte gerade nicht geöffnet werden. Versuch es noch einmal.",
+  genreEmpty: "Für dieses Genre wurde nichts gefunden.",
+  artistUnavailable: "Dieser Künstler konnte gerade nicht geöffnet werden. Versuch es noch einmal.",
+  artistNotFound: "Künstler nicht gefunden.",
+  albumUnavailable: "Dieses Album konnte gerade nicht geöffnet werden. Versuch es noch einmal.",
+  albumNotFound: "Album nicht gefunden.",
+  invalidAlbum: "Ungültiges Album.",
+  ytdlpMissing: "yt-dlp wurde auf diesem Computer nicht gefunden. Öffne die Einstellungen in YoutiFy, um es zu installieren.",
+  ytdlpTimeout: "yt-dlp hat zu lange nicht geantwortet.",
+  ytdlpCantRun: "yt-dlp konnte nicht ausgeführt werden ({error}). Öffne die Einstellungen in YoutiFy.",
+  botCheck: "YouTube verlangt von dieser Verbindung einen Nachweis, dass sie kein Bot ist. Falls du ein VPN nutzt, schalte es aus und versuch es noch einmal.",
+  videoUnavailable: "Dieses Video ist auf YouTube nicht verfügbar.",
+  ageRestricted: "Video mit Altersbeschränkung. Dafür werden Cookies eines angemeldeten Kontos benötigt.",
+  ytdlpFailed: "yt-dlp ist fehlgeschlagen.",
+  ytdlpOutdated: "{detail} YouTube hat sich vielleicht geändert: Aktualisiere yt-dlp in den Einstellungen.",
+  noAudio: "Für dieses Video gibt es kein Audioformat.",
+  noSdVideo: "Dieses Video hat keine kombinierte SD-Version. Nutze HD.",
+  streamRefused: "YouTube hat den Stream abgelehnt (HTTP {status}). Aktualisiere yt-dlp in den Einstellungen.",
+  noWinget: "yt-dlp wurde nicht gefunden und winget ist nicht verfügbar. Installiere es manuell: https://github.com/yt-dlp/yt-dlp",
+  installingYtdlp: "yt-dlp wird installiert",
+  updatingYtdlp: "yt-dlp wird aktualisiert",
+  directUpdateFailed: "Direktes Update fehlgeschlagen, versuche es mit winget",
+  downloadingTools: "yt-dlp und Deno werden von GitHub geladen",
+  alreadyLatest: "Bereits die neueste Version ({version})",
+  ytdlpReady: "yt-dlp {version} ist einsatzbereit",
+  updateFailed: "yt-dlp konnte nicht aktualisiert werden.",
+  toolMissing: "{tool} wurde auf diesem Computer nicht gefunden.",
+  downloadFailed: "Download von {tool} fehlgeschlagen (HTTP {status}).",
+  ffmpegPackage: "Unerwartetes FFmpeg-Paket.",
+  importBadLink: "Das ist kein Spotify- oder YouTube-Playlist-Link.",
+  importFailed: "Die Playlist konnte nicht gelesen werden. Ist sie öffentlich?",
+  importEmpty: "In dieser Playlist wurden keine Titel gefunden.",
 };
 
-const CATALOG: Record<Lang, Record<MsgKey, string>> = { en, "pt-BR": pt };
+const CATALOG: Record<Lang, Record<MsgKey, string>> = { en, de };
 
 /** A message translated when it is sent: a key plus the values for its {placeholders}. */
 export interface Msg {
@@ -124,7 +130,7 @@ export function tr(lang: Lang, text: Text): string {
   return CATALOG[lang][text.key].replace(/\{(\w+)\}/g, (all, name: string) => String(text.params?.[name] ?? all));
 }
 
-export const isLang = (v: unknown): v is Lang => v === "en" || v === "pt-BR";
+export const isLang = (v: unknown): v is Lang => v === "en" || v === "de";
 
 /** The language a request asked for. The app always says; anything else (media elements, curl) gets English. */
 export function langOf(req: { headers: Record<string, string | string[] | undefined> }): Lang {
@@ -133,4 +139,4 @@ export function langOf(req: { headers: Record<string, string | string[] | undefi
 }
 
 /** The code YouTube Music uses for its own words (genre names, artist bios). */
-export const youtubeLang = (lang: Lang) => (lang === "pt-BR" ? "pt" : "en");
+export const youtubeLang = (lang: Lang) => (lang === "de" ? "de" : "en");

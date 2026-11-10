@@ -226,7 +226,7 @@ export async function importLibrary(input: unknown, mode: "merge" | "replace"): 
   for (const p of incoming.playlists) {
     const match =
       lib.playlists.find((x) => x.id === p.id) ??
-      lib.playlists.find((x) => x.name.toLocaleLowerCase("pt-BR") === p.name.toLocaleLowerCase("pt-BR"));
+      lib.playlists.find((x) => x.name.toLocaleLowerCase() === p.name.toLocaleLowerCase());
     if (match) {
       const merged = union(match.tracks, p.tracks);
       if (!merged.added) continue; // already had every track: nothing changed
