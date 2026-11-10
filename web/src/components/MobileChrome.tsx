@@ -18,7 +18,7 @@ export function TabBar() {
   return (
     <nav
       aria-label={t.nav.main}
-      className="safe-bottom fixed inset-x-0 bottom-0 z-20 border-t border-line bg-bg/85 backdrop-blur-xl"
+      className="safe-bottom fixed inset-x-0 bottom-0 z-20 border-t border-line bg-surface-1/80 backdrop-blur-2xl"
     >
       <ul className="mx-auto grid h-16 max-w-md grid-cols-3">
         {tabs.map(({ to, key, Icon, end }) => (
@@ -29,7 +29,7 @@ export function TabBar() {
               className={({ isActive }) =>
                 cn(
                   "relative flex h-full flex-col items-center justify-center gap-1 text-[11px] font-medium transition-colors",
-                  isActive ? "text-fg" : "text-fg-3",
+                  isActive ? "text-accent-text" : "text-fg-3",
                 )
               }
             >
@@ -37,7 +37,7 @@ export function TabBar() {
                 <>
                   <span
                     className={cn(
-                      "absolute top-0 h-[3px] w-8 rounded-b-full bg-accent transition-transform duration-300 ease-out-expo",
+                      "absolute top-0 h-[3px] w-10 rounded-b-full bg-accent shadow-[0_0_14px_rgb(168_85_247/0.8)] transition-transform duration-300 ease-out-expo",
                       isActive ? "scale-x-100" : "scale-x-0",
                     )}
                   />
@@ -67,7 +67,7 @@ export function MiniPlayer() {
 
   return (
     <div className="fixed inset-x-2 bottom-[calc(72px+env(safe-area-inset-bottom))] z-20">
-      <div className="island p-1! shadow-[0_10px_30px_rgb(0_0_0/0.35)]">
+      <div className="island p-1! shadow-[0_10px_30px_rgb(40_10_80/0.5)]">
         <div className="island-core relative flex h-14 items-center gap-3 overflow-hidden pr-1 pl-1.5">
           <button
             type="button"
@@ -87,9 +87,9 @@ export function MiniPlayer() {
             type="button"
             onClick={toggle}
             aria-label={status === "playing" ? t.common.pause : t.common.play}
-            className="grid size-11 shrink-0 place-items-center rounded-full text-fg active:scale-90"
+            className="accent-glow grid size-10 shrink-0 place-items-center rounded-full bg-accent text-accent-ink active:scale-90"
           >
-            <PlayPauseIcon size={24} />
+            <PlayPauseIcon size={20} />
           </button>
           <span className="absolute inset-x-3 bottom-0 h-[2px] rounded-full bg-surface-4">
             <span className="block h-full rounded-full bg-accent" style={{ width: `${pct}%` }} />

@@ -106,14 +106,14 @@ export default function App() {
   };
 
   return (
-    <div className={cn("grain flex h-dvh flex-col bg-bg md:gap-2 md:p-2", desktop && "md:pt-0")}>
+    <div className={cn("grain flex h-dvh flex-col md:gap-2.5 md:p-2.5", desktop && "md:pt-0")}>
       {desktop && <TitleBar />}
-      <div className="flex min-h-0 flex-1 md:gap-2">
+      <div className="flex min-h-0 flex-1 md:gap-2.5">
         <Rail />
         <main
           ref={main}
           className={cn(
-            "scroll-area relative min-w-0 flex-1 overflow-y-auto md:rounded-[20px] md:bg-surface-1 md:ring-1 md:ring-line",
+            "scroll-area relative min-w-0 flex-1 overflow-y-auto md:rounded-[24px] md:bg-surface-1/60 md:ring-1 md:ring-line md:backdrop-blur-xl md:shadow-[0_18px_50px_rgb(0_0_0/0.28)]",
             hasTrack ? "pb-[calc(152px+env(safe-area-inset-bottom))]" : "pb-[calc(88px+env(safe-area-inset-bottom))]",
             "md:pb-0",
           )}

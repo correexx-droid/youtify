@@ -18,6 +18,8 @@ if (!app.requestSingleInstanceLock()) {
 }
 
 // Everything the user owns lives in their profile, so updates and reinstalls keep it.
+// The app was called Musike before the YoutiFy redesign: keep using that data folder so the library stays put.
+app.setPath("userData", path.join(app.getPath("appData"), "Musike"));
 const userData = app.getPath("userData");
 process.env.MUSIKE_DATA_DIR = path.join(userData, "data");
 process.env.MUSIKE_CACHE_DIR = path.join(userData, "cache");
@@ -37,8 +39,8 @@ const loadServer = async () => ({
 });
 
 const THEME = {
-  dark: { color: "#0B0C0F", symbolColor: "#ECEEF2" },
-  light: { color: "#E9EBEF", symbolColor: "#12141A" },
+  dark: { color: "#0A0613", symbolColor: "#F3EEFC" },
+  light: { color: "#EFE9FA", symbolColor: "#1A1029" },
 };
 const TITLEBAR_HEIGHT = 40;
 
@@ -114,7 +116,7 @@ function createMainWindow(url: string): BrowserWindow {
     minWidth: 380,
     minHeight: 560,
     show: false,
-    title: "Musike",
+    title: "YoutiFy",
     icon: path.join(here, "icon.png"),
     backgroundColor: THEME.dark.color,
     // Our own title bar (drawn by the web app) with the native window buttons on top of it:

@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { accentCss, DEFAULT_ACCENT, isHex } from "../lib/accent";
+import { accentCss, DEFAULT_ACCENT, isHex, LEGACY_DEFAULT_ACCENT } from "../lib/accent";
 
 /** How the app looks and what it shows, per device. The Now Playing panel lives in the UI store (it has a button too). */
 export interface Appearance {
@@ -24,9 +24,9 @@ export const DEFAULT_APPEARANCE: Appearance = {
   homeFavorites: true,
 };
 
-/** Ready-made accents. "volt" is Musike's own. */
+/** Ready-made accents. "purple" is YoutiFy's own. */
 export const ACCENTS = [
-  { id: "volt", color: DEFAULT_ACCENT },
+  { id: "purple", color: DEFAULT_ACCENT },
   { id: "mint", color: "#34d399" },
   { id: "aqua", color: "#22d3ee" },
   { id: "sky", color: "#60a5fa" },
@@ -44,7 +44,7 @@ const CSS_KEY = "musike:accent-css";
 export function cleanAppearance(input: unknown): Appearance {
   const v = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
   const out: Appearance = { ...DEFAULT_APPEARANCE };
-  if (isHex(v.accent)) out.accent = v.accent.toLowerCase();
+  if (isHex(v.accent) && v.accent.toLowerCase() !== LEGACY_DEFAULT_ACCENT) out.accent = v.accent.toLowerCase();
   for (const k of Object.keys(DEFAULT_APPEARANCE) as (keyof Appearance)[]) {
     if (k !== "accent" && typeof v[k] === "boolean") (out[k] as boolean) = v[k];
   }

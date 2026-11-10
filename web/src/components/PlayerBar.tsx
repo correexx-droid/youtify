@@ -1,4 +1,4 @@
-import { KeyboardIcon, QueueIcon, SidebarSimpleIcon } from "@phosphor-icons/react";
+import { KeyboardIcon, MicrophoneStageIcon, QueueIcon, SidebarSimpleIcon } from "@phosphor-icons/react";
 import { cn } from "../lib/format";
 import { useT } from "../i18n";
 import { selectCurrent, usePlayer, useStatusText } from "../player/player";
@@ -19,8 +19,11 @@ export function PlayerBar() {
   const setShortcutsOpen = useUi((s) => s.setShortcutsOpen);
 
   return (
-    <div className="island shrink-0">
-      <div className="island-core grid h-[84px] grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-4 px-3 lg:px-4">
+    <div className="island relative shrink-0 overflow-hidden">
+      {track && (
+        <img src={track.thumb} alt="" aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-0 w-1/2 scale-150 object-cover opacity-20 blur-3xl" />
+      )}
+      <div className="island-core relative grid h-[88px] grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-4 px-3 lg:px-4">
         <div className="flex min-w-0 items-center gap-3">
           {track ? (
             <>
@@ -30,10 +33,10 @@ export function PlayerBar() {
                 aria-label={t.player.showNowPlaying}
                 className="group relative shrink-0 rounded-[10px] transition-transform active:scale-[0.96]"
               >
-                <Artwork src={track.thumb} className="size-14 rounded-[10px]" />
+                <Artwork src={track.thumb} className="size-14 rounded-[12px] ring-1 ring-line shadow-[0_8px_24px_rgb(0_0_0/0.4)]" />
               </button>
               <div className="min-w-0">
-                <p className="truncate text-sm font-medium">{track.title}</p>
+                <p className="truncate text-sm font-semibold">{track.title}</p>
                 <p className={cn("truncate text-[13px]", status === "error" ? "text-danger" : "text-fg-2")}>
                   {statusText ?? track.artist}
                 </p>
@@ -52,6 +55,15 @@ export function PlayerBar() {
 
         <div className="flex items-center justify-end gap-1">
           <ModeSwitch className="max-2xl:hidden" />
+          <IconButton
+            label={t.nowPlaying.showLyrics}
+            size="sm"
+            active={panelOpen && panelTab === "lyrics"}
+            onClick={() => togglePanel("lyrics")}
+            disabled={!track}
+          >
+            <MicrophoneStageIcon size={18} weight={panelOpen && panelTab === "lyrics" ? "fill" : "regular"} />
+          </IconButton>
           <IconButton
             label={t.player.queue}
             size="sm"

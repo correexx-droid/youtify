@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name" translatable="false">Musike</string>
-    <string name="title_activity_main" translatable="false">Musike</string>
+    <string name="app_name" translatable="false">YoutiFy</string>
+    <string name="title_activity_main" translatable="false">YoutiFy</string>
     <string name="package_name" translatable="false">app.musike.android</string>
     <string name="custom_url_scheme" translatable="false">app.musike.android</string>
     <string name="playback_channel">Playback</string>

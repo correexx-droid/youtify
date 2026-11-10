@@ -16,7 +16,7 @@ function Shortcut({ to, label, tracks, cover }: { to: string; label: string; tra
   const playList = usePlayer((s) => s.playList);
   const t = useT();
   return (
-    <div className="group relative flex h-14 items-center gap-3 overflow-hidden rounded-[12px] bg-surface-2 pr-2 transition-colors hover:bg-surface-3 md:h-16">
+    <div className="group relative flex h-14 items-center gap-3 overflow-hidden rounded-[14px] bg-surface-2/70 pr-2 ring-1 ring-line transition-[background-color,box-shadow] hover:bg-surface-3 hover:ring-accent/40 md:h-16">
       <Link to={to} className="absolute inset-0" aria-label={label} />
       <span className="pointer-events-none size-14 shrink-0 overflow-hidden md:size-16">{cover}</span>
       <span className="pointer-events-none min-w-0 flex-1 truncate text-[13px] font-semibold md:text-sm">{label}</span>
@@ -38,7 +38,7 @@ function RecentCard({ track, onPlay }: { track: Track; onPlay: () => void }) {
   return (
     <button type="button" onClick={onPlay} className="group flex w-36 shrink-0 snap-start flex-col gap-2 text-left md:w-44">
       <span className="relative block">
-        <Artwork src={track.art} fallback={track.thumb} className="aspect-square w-full rounded-[14px]" />
+        <Artwork src={track.art} fallback={track.thumb} className="aspect-square w-full rounded-[16px] ring-1 ring-line transition-transform duration-300 ease-out-expo group-hover:-translate-y-1 group-hover:shadow-[0_16px_40px_rgb(88_28_135/0.45)]" />
         <span className="absolute right-2 bottom-2 grid size-11 translate-y-1 place-items-center rounded-full bg-accent text-accent-ink opacity-0 shadow-[0_8px_20px_rgb(0_0_0/0.4)] transition-[opacity,transform] duration-200 ease-out-expo group-hover:translate-y-0 group-hover:opacity-100 group-focus-visible:opacity-100">
           <PlayIcon size={20} weight="fill" />
         </span>
@@ -64,15 +64,16 @@ export default function Home() {
       <PageHeader />
 
       <div className="px-4 pt-2 pb-6 md:px-6 md:pt-8">
-        <h1 className="text-[28px] leading-tight font-semibold tracking-tight md:text-4xl">{t.time.greeting(new Date().getHours())}</h1>
+        <p className="mb-1 text-xs font-semibold tracking-[0.2em] text-accent-text uppercase">YoutiFy</p>
+        <h1 className="text-gradient text-[30px] leading-tight font-bold tracking-tight md:text-5xl">{t.time.greeting(new Date().getHours())}</h1>
       </div>
 
       {status === "loading" && <TrackListSkeleton rows={6} />}
 
       {empty && (
         <div className="mx-4 flex flex-col items-start gap-5 rounded-[20px] bg-surface-2 p-6 ring-1 ring-line md:mx-6 md:flex-row md:items-center md:p-8">
-          <span className="grid size-16 shrink-0 place-items-center rounded-[18px] bg-accent text-accent-ink">
-            <LogoMark className="size-10" />
+          <span className="accent-glow grid size-16 shrink-0 place-items-center rounded-[18px] bg-accent text-accent-ink">
+            <LogoMark plain className="size-10" />
           </span>
           <div className="flex-1">
             <p className="text-xl font-semibold tracking-tight">{t.home.startTitle}</p>

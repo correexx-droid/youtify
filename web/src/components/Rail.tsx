@@ -75,7 +75,7 @@ function RailLink({ to, label, sub, end, children }: { to: string; label: string
           <span
             className={cn(
               "relative grid size-11 shrink-0 place-items-center overflow-hidden rounded-[12px] transition-[box-shadow,transform] duration-200 ease-out-expo group-active:scale-95",
-              isActive ? "ring-2 ring-accent ring-offset-2 ring-offset-surface-2" : "",
+              isActive ? "ring-2 ring-accent ring-offset-2 ring-offset-surface-2 shadow-[0_0_18px_rgb(168_85_247/0.45)]" : "",
             )}
           >
             {children}
@@ -105,7 +105,7 @@ export function Rail() {
     <aside className="island hidden w-[78px] shrink-0 md:flex wide:w-[256px]">
       <div className="island-core flex w-full flex-col overflow-hidden">
         <div className="flex h-16 items-center justify-center wide:justify-start wide:px-4 [@media(max-height:540px)]:h-12">
-          <LogoMark className="size-8 text-accent-text wide:hidden" />
+          <LogoMark className="size-9 wide:hidden" />
           <span className="hidden wide:block">
             <Logo />
           </span>
@@ -121,7 +121,7 @@ export function Rail() {
               className={({ isActive }) =>
                 cn(
                   "flex h-11 items-center justify-center gap-3 rounded-full transition-colors duration-200 wide:justify-start wide:px-4 [@media(max-height:540px)]:h-9",
-                  isActive ? "bg-surface-4 text-fg" : "text-fg-2 hover:bg-surface-3 hover:text-fg",
+                  isActive ? "accent-glow bg-accent text-accent-ink" : "text-fg-2 hover:bg-surface-3 hover:text-fg",
                 )
               }
             >
@@ -135,10 +135,10 @@ export function Rail() {
           ))}
         </nav>
 
-        <div className="mx-4 my-3 h-px bg-line [@media(max-height:540px)]:my-1.5" />
+        <div className="mx-4 my-3 h-px bg-linear-to-r from-transparent via-line-strong to-transparent [@media(max-height:540px)]:my-1.5" />
 
         <div className="flex items-center justify-between px-4 pb-1 [@media(max-height:540px)]:pb-0">
-          <span className="hidden text-xs font-medium text-fg-3 wide:block">{t.nav.yourCollection}</span>
+          <span className="hidden text-[11px] font-semibold tracking-[0.14em] text-fg-3 uppercase wide:block">{t.nav.yourCollection}</span>
           <button
             type="button"
             onClick={() => setCreating(true)}
@@ -152,7 +152,7 @@ export function Rail() {
 
         <div className="scroll-area flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-2 pb-2">
           <RailLink to={paths.favorites} label={t.nav.favorites} sub={t.common.tracks(favorites.length)}>
-            <span className="grid size-full place-items-center bg-accent-soft text-accent-text">
+            <span className="grid size-full place-items-center bg-accent text-accent-ink">
               <HeartIcon size={20} weight="fill" />
             </span>
           </RailLink>

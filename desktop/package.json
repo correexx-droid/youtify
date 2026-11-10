@@ -1,6 +1,6 @@
 {
   "name": "musike-desktop",
-  "productName": "Musike",
+  "productName": "YoutiFy",
   "version": "1.5.1",
   "description": "Your music, uninterrupted.",
   "author": "Musike",
@@ -18,7 +18,7 @@
   },
   "build": {
     "appId": "app.musike.desktop",
-    "productName": "Musike",
+    "productName": "YoutiFy",
     "copyright": "Musike",
     "directories": {
       "output": "out",
@@ -47,7 +47,7 @@
         }
       ],
       "icon": "build/icon.ico",
-      "artifactName": "Musike-Setup-${version}.${ext}"
+      "artifactName": "YoutiFy-Setup-${version}.${ext}"
     },
     "mac": {
       "target": [
@@ -96,7 +96,7 @@
       "packageName": "musike"
     },
     "dmg": {
-      "title": "Musike ${version}"
+      "title": "YoutiFy ${version}"
     },
     "nsis": {
       "oneClick": false,
@@ -104,7 +104,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": "always",
       "createStartMenuShortcut": true,
-      "shortcutName": "Musike",
+      "shortcutName": "YoutiFy",
       "runAfterFinish": true,
       "installerIcon": "build/icon.ico",
       "uninstallerIcon": "build/icon.ico",

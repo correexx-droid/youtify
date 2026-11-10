@@ -59,12 +59,12 @@ export default defineConfig(({ mode }) => {
             registerType: "autoUpdate",
             includeAssets: ["favicon.svg", "apple-touch-icon.png"],
             manifest: {
-              name: "Musike",
-              short_name: "Musike",
+              name: "YoutiFy",
+              short_name: "YoutiFy",
               description: "Your music, uninterrupted.",
               lang: "en",
-              theme_color: "#0B0C0F",
-              background_color: "#0B0C0F",
+              theme_color: "#0A0613",
+              background_color: "#0A0613",
               display: "standalone",
               start_url: "/",
               icons: [

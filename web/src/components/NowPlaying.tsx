@@ -1,6 +1,7 @@
 import {
   CaretDownIcon,
   MagnifyingGlassIcon,
+  MicrophoneStageIcon,
   QueueIcon,
   RadioIcon,
   VideoCameraSlashIcon,
@@ -17,6 +18,7 @@ import { useUi, type PanelTab } from "../stores/ui";
 import { Artwork } from "./Artwork";
 import { FavoriteButton, ModeSwitch, Scrubber, Transport } from "./Controls";
 import { IconButton } from "./IconButton";
+import { LyricsCard, LyricsView } from "./Lyrics";
 import { QueueList } from "./Queue";
 import { SLOT, VideoSlot } from "./Video";
 
@@ -48,14 +50,14 @@ function Stage({ track, slot, className }: { track: Track; slot: number; classNa
         src={track.thumb}
         alt=""
         aria-hidden="true"
-        className="absolute inset-[8%] h-[84%] w-[84%] scale-110 rounded-full object-cover opacity-50 blur-3xl"
+        className="absolute inset-[6%] h-[88%] w-[88%] scale-110 rounded-full object-cover opacity-70 blur-3xl saturate-150"
       />
       <Artwork
         src={track.art}
         fallback={track.thumb}
         alt={t.nowPlaying.coverOf(track.title)}
         iconSize={48}
-        className="relative size-full rounded-[18px] shadow-[0_24px_60px_rgb(0_0_0/0.45)]"
+        className="relative size-full rounded-[22px] ring-1 ring-white/10 shadow-[0_28px_70px_rgb(40_10_80/0.6)]"
       />
       {note && (
         <span className="absolute inset-x-3 bottom-3 flex items-center justify-center gap-2 rounded-full bg-black/65 px-3 py-2 text-center text-[13px] font-medium text-white backdrop-blur-md">
@@ -93,6 +95,7 @@ function PanelBody({ tab, slot }: { tab: PanelTab; slot: number }) {
   const queue = usePlayer((s) => s.queue);
   const index = usePlayer((s) => s.index);
   const t = useT();
+  const openPanel = useUi((s) => s.openPanel);
 
   if (tab === "queue") return <QueueList />;
   if (!track) {
@@ -104,15 +107,16 @@ function PanelBody({ tab, slot }: { tab: PanelTab; slot: number }) {
       <Stage track={track} slot={slot} />
       <TrackHeading track={track} />
       <ModeSwitch />
+      <LyricsCard track={track} onOpen={() => openPanel("lyrics")} />
       <button
         type="button"
         onClick={() => void startRadio(track)}
-        className="flex h-11 items-center justify-center gap-2 rounded-full bg-surface-1 text-sm font-medium ring-1 ring-line transition-colors hover:bg-surface-3 active:scale-[0.98]"
+        className="flex h-11 items-center justify-center gap-2 rounded-full bg-surface-3/70 text-sm font-medium ring-1 ring-line transition-colors hover:bg-surface-4 hover:ring-accent/40 active:scale-[0.98]"
       >
         <RadioIcon size={18} /> {t.nowPlaying.startRadio}
       </button>
       {nextUp && (
-        <div className="rounded-[14px] bg-surface-1 p-3 ring-1 ring-line">
+        <div className="rounded-[16px] bg-surface-3/50 p-3 ring-1 ring-line">
           <p className="pb-2 text-xs font-medium text-fg-3">{t.nowPlaying.upNext}</p>
           <div className="flex items-center gap-3">
             <Artwork src={nextUp.thumb} className="size-10 rounded-[8px]" />
@@ -130,10 +134,11 @@ function PanelBody({ tab, slot }: { tab: PanelTab; slot: number }) {
 function PanelTabs({ tab, onTab }: { tab: PanelTab; onTab: (t: PanelTab) => void }) {
   const t = useT();
   return (
-    <div role="tablist" className="flex gap-1">
+    <div role="tablist" className="flex gap-1 rounded-full bg-surface-1/70 p-1 ring-1 ring-line">
       {(
         [
           ["playing", t.nowPlaying.tabPlaying],
+          ["lyrics", t.nowPlaying.tabLyrics],
           ["queue", t.nowPlaying.tabQueue],
         ] as const
       ).map(([id, label]) => (
@@ -144,13 +149,35 @@ function PanelTabs({ tab, onTab }: { tab: PanelTab; onTab: (t: PanelTab) => void
           aria-selected={tab === id}
           onClick={() => onTab(id)}
           className={cn(
-            "h-9 rounded-full px-4 text-sm font-medium transition-colors",
-            tab === id ? "bg-surface-4 text-fg" : "text-fg-2 hover:text-fg",
+            "h-8 rounded-full px-3.5 text-[13px] font-semibold transition-colors",
+            tab === id ? "accent-glow bg-accent text-accent-ink" : "text-fg-2 hover:text-fg",
           )}
         >
           {label}
         </button>
       ))}
+    </div>
+  );
+}
+
+/** The panel's scrolling body. Lyrics scroll on their own (they follow the song), so they get the full height. */
+function PanelContent({ tab }: { tab: PanelTab }) {
+  const track = usePlayer(selectCurrent);
+  const t = useT();
+  if (tab === "lyrics") {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col px-2 pb-2">
+        {track ? (
+          <LyricsView key={track.id} track={track} className="flex-1" />
+        ) : (
+          <p className="px-2 py-16 text-center text-sm text-fg-2">{t.nowPlaying.playSomething}</p>
+        )}
+      </div>
+    );
+  }
+  return (
+    <div className="scroll-area flex-1 overflow-y-auto px-2">
+      <PanelBody tab={tab} slot={SLOT.panel} />
     </div>
   );
 }
@@ -170,9 +197,7 @@ export function SidePanel() {
             <XIcon size={18} />
           </IconButton>
         </div>
-        <div className="scroll-area flex-1 overflow-y-auto px-2">
-          <PanelBody tab={tab} slot={SLOT.panel} />
-        </div>
+        <PanelContent tab={tab} />
       </div>
     </aside>
   );
@@ -215,9 +240,7 @@ export function PanelDrawer() {
                   <XIcon size={18} />
                 </IconButton>
               </div>
-              <div className="scroll-area flex-1 overflow-y-auto px-2">
-                <PanelBody tab={tab} slot={SLOT.panel} />
-              </div>
+              <PanelContent tab={tab} />
             </div>
           </motion.aside>
         </div>
@@ -232,7 +255,7 @@ export function NowPlayingSheet({ open, onClose }: { open: boolean; onClose: () 
   const track = usePlayer(selectCurrent);
   const reduce = useReducedMotion();
   const drag = useDragControls();
-  const [view, setView] = useState<"player" | "queue">("player");
+  const [view, setView] = useState<"player" | "queue" | "lyrics">("player");
   const t = useT();
 
   return createPortal(
@@ -260,29 +283,53 @@ export function NowPlayingSheet({ open, onClose }: { open: boolean; onClose: () 
             src={track.thumb}
             alt=""
             aria-hidden="true"
-            className="pointer-events-none absolute inset-0 h-1/2 w-full scale-125 object-cover opacity-25 blur-3xl"
+            className="pointer-events-none absolute inset-0 h-2/3 w-full scale-125 object-cover opacity-40 blur-3xl saturate-150"
           />
-          <div className="pointer-events-none absolute inset-0 bg-linear-to-b from-transparent via-bg/70 to-bg" />
+          <div className="pointer-events-none absolute inset-0 bg-linear-to-b from-accent/15 via-bg/75 to-bg" />
 
-          <div className="overlay-top relative flex flex-1 flex-col px-5">
+          <div className="overlay-top relative flex min-h-0 flex-1 flex-col px-5">
             <div className="flex h-14 touch-none items-center justify-between" onPointerDown={(e) => drag.start(e)}>
               <IconButton label={t.common.close} onClick={onClose} className="-ml-2 text-fg">
                 <CaretDownIcon size={24} />
               </IconButton>
               <div className="mx-auto mt-0 h-1 w-10 rounded-full bg-fg-3/50" />
-              <IconButton
-                label={view === "queue" ? t.nowPlaying.backToPlayer : t.nowPlaying.showQueue}
-                active={view === "queue"}
-                onClick={() => setView(view === "queue" ? "player" : "queue")}
-                className="-mr-2"
-              >
-                <QueueIcon size={22} />
-              </IconButton>
+              <div className="-mr-2 flex items-center">
+                <IconButton
+                  label={view === "lyrics" ? t.nowPlaying.backToPlayer : t.nowPlaying.showLyrics}
+                  active={view === "lyrics"}
+                  onClick={() => setView(view === "lyrics" ? "player" : "lyrics")}
+                >
+                  <MicrophoneStageIcon size={22} weight={view === "lyrics" ? "fill" : "regular"} />
+                </IconButton>
+                <IconButton
+                  label={view === "queue" ? t.nowPlaying.backToPlayer : t.nowPlaying.showQueue}
+                  active={view === "queue"}
+                  onClick={() => setView(view === "queue" ? "player" : "queue")}
+                >
+                  <QueueIcon size={22} />
+                </IconButton>
+              </div>
             </div>
 
             {view === "queue" ? (
               <div className="scroll-area -mx-3 flex-1 overflow-y-auto pb-6">
                 <QueueList />
+              </div>
+            ) : view === "lyrics" ? (
+              <div className="flex min-h-0 flex-1 flex-col gap-3 pb-[calc(16px+env(safe-area-inset-bottom))]">
+                <div className="flex items-center gap-3">
+                  <Artwork src={track.thumb} className="size-12 shrink-0 rounded-[10px]" />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-semibold">{track.title}</p>
+                    <p className="truncate text-sm text-fg-2">{track.artist}</p>
+                  </div>
+                  <FavoriteButton track={track} size="md" />
+                </div>
+                <LyricsView key={track.id} track={track} large className="-mx-2 flex-1" />
+                <Scrubber touch />
+                <div className="flex justify-center">
+                  <Transport />
+                </div>
               </div>
             ) : (
               <div className="flex flex-1 flex-col justify-evenly gap-4 pb-[calc(16px+env(safe-area-inset-bottom))]">

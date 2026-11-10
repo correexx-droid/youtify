@@ -6,10 +6,10 @@ const serverUrl = (globalThis as { process?: { env?: Record<string, string | und
 
 const config: CapacitorConfig = {
   appId: "app.musike.android",
-  appName: "Musike",
+  appName: "YoutiFy",
   // The web app built in Android mode: same UI, backend running on the phone (see web/src/native).
   webDir: "../web/dist-native",
-  backgroundColor: "#0B0C0F",
+  backgroundColor: "#0A0613",
   android: {
     // Music keeps loading while the screen is off or another app is in front.
     allowMixedContent: false,
@@ -18,7 +18,7 @@ const config: CapacitorConfig = {
     // The status bar area is padded by the app itself, like on Android.
     contentInset: "never",
     scrollEnabled: true,
-    backgroundColor: "#0B0C0F",
+    backgroundColor: "#0A0613",
   },
   ...(serverUrl ? { server: { url: serverUrl, cleartext: false } } : {}),
   plugins: {

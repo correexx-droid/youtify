@@ -23,7 +23,7 @@ export interface TrackMenuState {
 }
 
 type Theme = "dark" | "light";
-export type PanelTab = "playing" | "queue";
+export type PanelTab = "playing" | "lyrics" | "queue";
 
 interface UiState {
   theme: Theme;
@@ -80,7 +80,7 @@ export const useUi = create<UiState>((set, get) => ({
 
   setTheme: (theme) => {
     document.documentElement.dataset.theme = theme;
-    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", theme === "dark" ? "#0B0C0F" : "#E9EBEF");
+    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", theme === "dark" ? "#0A0613" : "#EFE9FA");
     desktop?.setTheme(theme);
     try {
       localStorage.setItem("musike:theme", theme);

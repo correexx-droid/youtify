@@ -34,7 +34,7 @@ export async function createBackup(): Promise<Backup> {
     format: "musike-backup",
     version: 1,
     exportedAt: new Date().toISOString(),
-    app: `Musike ${__APP_VERSION__}`,
+    app: `YoutiFy ${__APP_VERSION__}`,
     library: { favorites: library.favorites, playlists: library.playlists, history: library.history },
     settings: {
       theme: useUi.getState().theme,
