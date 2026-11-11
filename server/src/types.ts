@@ -6,7 +6,7 @@ export interface Track {
   duration: number;
   thumb: string;
   art: string;
-  kind: "song" | "video";
+  kind: "song" | "video" | "local";
 }
 
 export interface Playlist {
@@ -26,6 +26,8 @@ export interface Library {
 import { tr, type Text } from "./i18n.js";
 
 export const VIDEO_ID = /^[A-Za-z0-9_-]{11}$/;
+/** Songs imported from the user's own audio files: "lo_" plus 16 hex digits, stored on the device. */
+export const LOCAL_ID = /^lo_[0-9a-f]{16}$/;
 
 /** Machine-readable reason so the web app can offer the right fix (e.g. "update yt-dlp"). */
 export type ErrorCode = "tool_missing" | "maybe_outdated" | "bot_check";

@@ -108,6 +108,7 @@ function PanelBody({ tab, slot }: { tab: PanelTab; slot: number }) {
       <TrackHeading track={track} />
       <ModeSwitch />
       <LyricsCard track={track} onOpen={() => openPanel("lyrics")} />
+      {track.kind !== "local" && (
       <button
         type="button"
         onClick={() => void startRadio(track)}
@@ -115,6 +116,7 @@ function PanelBody({ tab, slot }: { tab: PanelTab; slot: number }) {
       >
         <RadioIcon size={18} /> {t.nowPlaying.startRadio}
       </button>
+      )}
       {nextUp && (
         <div className="rounded-[16px] bg-surface-3/50 p-3 ring-1 ring-line">
           <p className="pb-2 text-xs font-medium text-fg-3">{t.nowPlaying.upNext}</p>

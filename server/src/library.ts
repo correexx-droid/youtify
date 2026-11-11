@@ -1,5 +1,5 @@
 import { msg } from "./i18n.js";
-import { HttpError, VIDEO_ID, type Library, type Playlist, type Track } from "./types.js";
+import { HttpError, LOCAL_ID, VIDEO_ID, type Library, type Playlist, type Track } from "./types.js";
 
 // No Node-only imports here: the Android app runs this same module, with its own storage.
 
@@ -42,9 +42,12 @@ const str = (v: unknown, max: number) => (typeof v === "string" ? v.slice(0, max
 
 export function sanitizeTrack(input: unknown): Track {
   const t = (input ?? {}) as Record<string, unknown>;
-  const id = str(t.id, 11);
-  if (!VIDEO_ID.test(id)) throw new HttpError(400, msg("invalidTrack"));
+  const id = str(t.id, 19);
+  const local = LOCAL_ID.test(id);
+  if (!VIDEO_ID.test(id) && !local) throw new HttpError(400, msg("invalidTrack"));
   const url = (v: unknown) => {
+    // Imported songs carry their cover as a small inline JPEG.
+    if (local && typeof v === "string" && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(v) && v.length <= 60_000) return v;
     const s = str(v, 500);
     return /^https:\/\//.test(s) ? s : "";
   };
@@ -56,7 +59,7 @@ export function sanitizeTrack(input: unknown): Track {
     duration: typeof t.duration === "number" && Number.isFinite(t.duration) ? Math.max(0, Math.round(t.duration)) : 0,
     thumb: url(t.thumb),
     art: url(t.art),
-    kind: t.kind === "video" ? "video" : "song",
+    kind: local ? "local" : t.kind === "video" ? "video" : "song",
   };
 }
 

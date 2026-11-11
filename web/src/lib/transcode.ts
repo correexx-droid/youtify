@@ -15,6 +15,8 @@ export const canTranscode = (): boolean =>
 export interface CompressResult {
   file: Uint8Array;
   codec: "opus" | "raw";
+  /** Seconds, when the audio was decoded. */
+  duration?: number;
 }
 
 async function decode(bytes: Uint8Array): Promise<AudioBuffer> {
@@ -98,7 +100,8 @@ export async function compressTrack(
   bitrate: number,
   onProgress?: (f: number) => void,
 ): Promise<CompressResult> {
-  const raw = (): CompressResult => ({ file: encodeYtfy({ codec: "raw", mime, bytes }), codec: "raw" });
+  let duration: number | undefined;
+  const raw = (): CompressResult => ({ file: encodeYtfy({ codec: "raw", mime, bytes }), codec: "raw", duration });
   if (!canTranscode()) return raw();
   let pcm: AudioBuffer;
   try {
@@ -106,6 +109,7 @@ export async function compressTrack(
   } catch {
     return raw();
   }
+  duration = pcm.duration;
   if (pcm.duration > MAX_SECONDS) return raw();
   const opus = await encodeOpus(pcm, bitrate, onProgress);
   const content: YtfyContent = {
@@ -119,5 +123,5 @@ export async function compressTrack(
     durations: opus.durations,
   };
   const file = encodeYtfy(content);
-  return file.length < bytes.length ? { file, codec: "opus" } : raw();
+  return file.length < bytes.length ? { file, codec: "opus", duration } : raw();
 }

@@ -83,9 +83,11 @@ export function TrackMenu() {
       <Item icon={<ListPlusIcon size={18} />} onClick={run(() => usePlayer.getState().addToQueue(menu.track))}>
         {t.trackMenu.addToQueue}
       </Item>
-      <Item icon={<RadioIcon size={18} />} onClick={run(() => void usePlayer.getState().startRadio(menu.track))}>
-        {t.trackMenu.startRadio}
-      </Item>
+      {menu.track.kind !== "local" && (
+        <Item icon={<RadioIcon size={18} />} onClick={run(() => void usePlayer.getState().startRadio(menu.track))}>
+          {t.trackMenu.startRadio}
+        </Item>
+      )}
       <div className="mx-3 my-1 h-px bg-line" />
       <Item
         icon={<HeartIcon size={18} weight={isFavorite ? "fill" : "regular"} className={isFavorite ? "text-accent-text" : ""} />}
@@ -105,13 +107,17 @@ export function TrackMenu() {
           {t.trackMenu.removeFromPlaylist}
         </Item>
       )}
-      <div className="mx-3 my-1 h-px bg-line" />
-      <Item
-        icon={<ArrowSquareOutIcon size={18} />}
-        onClick={run(() => window.open(`https://www.youtube.com/watch?v=${menu.track.id}`, "_blank", "noopener"))}
-      >
-        {t.trackMenu.openYoutube}
-      </Item>
+      {menu.track.kind !== "local" && (
+        <>
+          <div className="mx-3 my-1 h-px bg-line" />
+          <Item
+            icon={<ArrowSquareOutIcon size={18} />}
+            onClick={run(() => window.open(`https://www.youtube.com/watch?v=${menu.track.id}`, "_blank", "noopener"))}
+          >
+            {t.trackMenu.openYoutube}
+          </Item>
+        </>
+      )}
     </div>
   );
 

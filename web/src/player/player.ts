@@ -138,7 +138,9 @@ const needsClipLookup = (track: Track, preferVideo: boolean) =>
 
 export const usePlayer = create<PlayerState>((set, get) => {
   const kindFor = (track: Track): Kind =>
-    capabilities.video && get().preferVideo && (track.kind === "video" || !!clipFor.get(track.id)) ? "video" : "audio";
+    track.kind !== "local" && capabilities.video && get().preferVideo && (track.kind === "video" || !!clipFor.get(track.id))
+      ? "video"
+      : "audio";
   /** The YouTube id to stream: the song itself, or its music video in Video mode. */
   const mediaIdFor = (track: Track, kind: Kind) =>
     kind === "video" && track.kind !== "video" ? clipFor.get(track.id)! : track.id;
@@ -210,9 +212,12 @@ export const usePlayer = create<PlayerState>((set, get) => {
     // Otherwise the server's proxy URL is known right away; on Android the stream is first resolved on the phone.
     const online = () => streamSource(mediaIdFor(track, kind), kind, s.quality);
     const source =
-      kind === "audio" && isOffline(track.id)
-        ? offlineUrl(track.id).then((url) => url ?? online())
-        : online();
+      track.kind === "local"
+        ? // The user's own file only exists on the device it was imported on.
+          offlineUrl(track.id).then((url) => url ?? Promise.reject(new Error(getT().player.localMissing)))
+        : kind === "audio" && isOffline(track.id)
+          ? offlineUrl(track.id).then((url) => url ?? online())
+          : online();
     if (typeof source === "string") start(source);
     else {
       const mine = token;
@@ -226,7 +231,11 @@ export const usePlayer = create<PlayerState>((set, get) => {
 
   async function continueWithRadio() {
     const s = get();
-    const last = s.queue[s.index];
+    // Radio grows from the last YouTube song in the queue (own files have no "related songs").
+    const last = s.queue
+      .slice(0, s.index + 1)
+      .reverse()
+      .find((t) => t.kind !== "local");
     if (!last) return;
     set({ status: "loading", statusText: "fetchingRadio" });
     try {
@@ -252,7 +261,7 @@ export const usePlayer = create<PlayerState>((set, get) => {
     useLibrary.getState().recordPlay(track);
     // Warm up the next track (and, in Video mode, find and resolve its clip) so it starts quickly.
     const upcoming = s.queue[s.index + 1];
-    if (!upcoming) return;
+    if (!upcoming || upcoming.kind === "local") return;
     if (s.preferVideo) void lookupClip(upcoming).then((id) => api.prepare(id ?? upcoming.id).catch(() => {}));
     else api.prepare(upcoming.id).catch(() => {});
   }
@@ -606,7 +615,11 @@ function setMetadata(track: Track) {
     artist: track.artist,
     album: track.album ?? "",
     artwork:
-      track.kind === "video"
+      track.kind === "local"
+        ? track.art
+          ? [{ src: track.art, sizes: "300x300", type: "image/jpeg" }]
+          : []
+        : track.kind === "video"
         ? [
             { src: track.art, sizes: "1280x720", type: "image/jpeg" },
             { src: track.thumb, sizes: "320x180", type: "image/jpeg" },

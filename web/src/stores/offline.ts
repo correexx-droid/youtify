@@ -24,6 +24,8 @@ export interface OfflineItem {
   original: number;
   bitrate: number;
   savedAt: number;
+  /** Imported from the user's own file: kept as long as the library holds the song, never downloaded again. */
+  local?: boolean;
 }
 
 export interface ActiveJob {
@@ -188,6 +190,16 @@ function tracksOf(lib: Pick<Library, "favorites" | "playlists">, key: PinKey): T
   return lib.playlists.find((p) => `playlist:${p.id}` === key)?.tracks ?? null;
 }
 
+/** Ids of every song anywhere in the library (favorites, playlists, history). */
+function libraryIds(): Set<string> {
+  const lib = useLibrary.getState();
+  const ids = new Set<string>();
+  for (const t of lib.favorites) ids.add(t.id);
+  for (const t of lib.history) ids.add(t.id);
+  for (const p of lib.playlists) for (const t of p.tracks) ids.add(t.id);
+  return ids;
+}
+
 /** Every track some downloaded collection holds. */
 function wantedTracks(): Map<string, Track> {
   const lib = useLibrary.getState();
@@ -220,8 +232,9 @@ function sync() {
       useOffline.setState({ pins });
     }
     // Only clean up once the library is really loaded, or an empty first render would wipe everything.
-    for (const id of Object.keys(state.items)) {
-      if (!wanted.has(id)) {
+    const everywhere = libraryIds();
+    for (const [id, item] of Object.entries(state.items)) {
+      if (item.local ? !everywhere.has(id) : !wanted.has(id)) {
         void deleteSong(id).catch(() => {});
         useOffline.setState((s) => {
           const items = { ...s.items };
@@ -232,7 +245,7 @@ function sync() {
     }
   }
 
-  const queue = [...wanted.keys()].filter((id) => !state.items[id] && !state.failed[id]);
+  const queue = [...wanted.keys()].filter((id) => !id.startsWith("lo_") && !state.items[id] && !state.failed[id]);
   useOffline.setState({ queue });
   void work(wanted);
 }
@@ -295,6 +308,98 @@ async function saveOne(track: Track) {
   } catch (e) {
     useOffline.setState((s) => ({ failed: { ...s.failed, [track.id]: (e as Error).message || "failed" } }));
   }
+}
+
+// ---------------------------------------------------------------- Own audio files
+
+export interface ImportProgress {
+  index: number;
+  total: number;
+  name: string;
+  phase: "read" | "compress";
+  progress: number;
+}
+
+export interface ImportOutcome {
+  tracks: Track[];
+  failed: string[];
+  stored: number;
+  original: number;
+}
+
+/**
+ * Imports audio files from the device (MP3, M4A, FLAC, WAV, OGG…): tags and cover from the file, the audio
+ * compressed into a YTFY file like downloaded songs. Returns the new tracks; the caller files them in a playlist.
+ */
+export async function importLocalFiles(files: File[], onProgress?: (p: ImportProgress) => void): Promise<ImportOutcome> {
+  const { readTags, guessFromName, localId, coverThumb, mimeFor } = await import("../lib/localImport");
+  const bitrate = QUALITIES.find((q) => q.id === useOffline.getState().quality)!.bitrate;
+  const out: ImportOutcome = { tracks: [], failed: [], stored: 0, original: 0 };
+  for (const [index, file] of files.entries()) {
+    const report = (phase: ImportProgress["phase"], progress: number) =>
+      onProgress?.({ index, total: files.length, name: file.name, phase, progress });
+    try {
+      report("read", 0);
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const id = await localId(bytes);
+      const tags = readTags(bytes);
+      const guess = guessFromName(file.name);
+      const thumb = await coverThumb(tags.cover);
+      const existing = useOffline.getState().items[id];
+      let duration = 0;
+      if (!existing) {
+        report("compress", 0);
+        const result = await compressTrack(bytes, mimeFor(file), bitrate, (f) => report("compress", f));
+        duration = result.duration ?? (await probeDuration(file));
+        const item: OfflineItem = {
+          id,
+          title: tags.title || guess.title,
+          artist: tags.artist || guess.artist,
+          codec: result.codec,
+          stored: result.file.length,
+          original: bytes.length,
+          bitrate: result.codec === "opus" ? bitrate : 0,
+          savedAt: Date.now(),
+          local: true,
+        };
+        await putSong(item, result.file);
+        useOffline.setState((s) => ({ items: { ...s.items, [id]: item } }));
+        out.stored += result.file.length;
+        out.original += bytes.length;
+      } else {
+        duration = await probeDuration(file);
+      }
+      out.tracks.push({
+        id,
+        title: tags.title || guess.title,
+        artist: tags.artist || guess.artist,
+        album: tags.album || undefined,
+        duration: Math.round(duration),
+        thumb,
+        art: thumb,
+        kind: "local",
+      });
+    } catch {
+      out.failed.push(file.name);
+    }
+  }
+  return out;
+}
+
+function probeDuration(file: File): Promise<number> {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(file);
+    const a = new Audio();
+    const done = (v: number) => {
+      URL.revokeObjectURL(url);
+      resolve(Number.isFinite(v) ? v : 0);
+    };
+    a.preload = "metadata";
+    a.onloadedmetadata = () => done(a.duration);
+    a.onerror = () => done(0);
+    setTimeout(() => done(0), 8000);
+    a.src = url;
+  });
 }
 
 // ---------------------------------------------------------------- Playback

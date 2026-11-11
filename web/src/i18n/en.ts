@@ -167,6 +167,7 @@ export const en = {
     streamFailed: "YouTube stopped serving this track. Try it again in a moment.",
     offline: "You're offline. Connect to the internet to play music.",
     httpError: (status: number) => `Error ${status}`,
+    localMissing: "This song was imported on another device and isn't stored here.",
   },
 
   nowPlaying: {
@@ -183,6 +184,22 @@ export const en = {
     showQueue: "Show queue",
     tabLyrics: "Lyrics",
     showLyrics: "Show lyrics",
+  },
+
+  importFiles: {
+    button: "Import music",
+    title: "Import your own music",
+    body: (playlist: string) =>
+      `Add MP3s and other audio files from this device. They're compressed to save space, kept on this device and put in the playlist "${playlist}".`,
+    pick: "Choose audio files",
+    working: (n: number, total: number, name: string) => `${n}/${total}: ${name}`,
+    keepsGoing: "You can close this window: importing continues in the background.",
+    done: (n: number, playlist: string) => `${n} ${n === 1 ? "song" : "songs"} added to "${playlist}".`,
+    saved: (size: string) => `${size} saved by compression.`,
+    skipped: (n: number) => `${n} ${n === 1 ? "file" : "files"} couldn't be read`,
+    more: "Import more",
+    open: "Open playlist",
+    failed: "These files couldn't be imported.",
   },
 
   importLink: {

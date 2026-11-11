@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { Cover, type CoverKind } from "../components/Cover";
 import { NamePlaylistDialog } from "../components/Dialogs";
+import { ImportFilesButton } from "../components/ImportFiles";
 import { ImportPlaylistButton } from "../components/ImportPlaylist";
 import { PageHeader } from "../components/Page";
 import { useT } from "../i18n";
@@ -47,6 +48,7 @@ export default function Library() {
         title={t.nav.library}
         actions={
           <>
+          <ImportFilesButton className="max-sm:px-3 max-sm:[&>span]:hidden" />
           <ImportPlaylistButton className="max-sm:px-3 max-sm:[&>span]:hidden" />
           <IconButton label={t.library.backup} onClick={() => setSettingsOpen(true)}>
             <DatabaseIcon size={20} />

@@ -6,7 +6,8 @@ export interface Track {
   duration: number;
   thumb: string;
   art: string;
-  kind: "song" | "video";
+  /** "local": imported from the user's own audio file, kept on this device. */
+  kind: "song" | "video" | "local";
 }
 
 export interface Playlist {

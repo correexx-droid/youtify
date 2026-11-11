@@ -161,6 +161,7 @@ export const de: Messages = {
     streamFailed: "YouTube liefert diesen Titel gerade nicht. Versuch es gleich noch einmal.",
     offline: "Du bist offline. Verbinde dich mit dem Internet oder hör heruntergeladene Songs.",
     httpError: (status) => `Fehler ${status}`,
+    localMissing: "Dieser Song wurde auf einem anderen Gerät importiert und ist hier nicht gespeichert.",
   },
 
   nowPlaying: {
@@ -177,6 +178,22 @@ export const de: Messages = {
     showQueue: "Warteschlange anzeigen",
     tabLyrics: "Songtext",
     showLyrics: "Songtext anzeigen",
+  },
+
+  importFiles: {
+    button: "Musik importieren",
+    title: "Eigene Musik importieren",
+    body: (playlist) =>
+      `Füge MP3s und andere Audiodateien von diesem Gerät hinzu. Sie werden platzsparend komprimiert, auf diesem Gerät gespeichert und in die Playlist „${playlist}" gelegt.`,
+    pick: "Audiodateien auswählen",
+    working: (n, total, name) => `${n}/${total}: ${name}`,
+    keepsGoing: "Du kannst das Fenster schließen: Der Import läuft im Hintergrund weiter.",
+    done: (n, playlist) => `${n} ${n === 1 ? "Song" : "Songs"} zu „${playlist}" hinzugefügt.`,
+    saved: (size) => `${size} durch Kompression gespart.`,
+    skipped: (n) => `${n} ${n === 1 ? "Datei konnte" : "Dateien konnten"} nicht gelesen werden`,
+    more: "Weitere importieren",
+    open: "Playlist öffnen",
+    failed: "Diese Dateien konnten nicht importiert werden.",
   },
 
   importLink: {
