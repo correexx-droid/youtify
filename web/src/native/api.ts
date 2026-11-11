@@ -15,7 +15,7 @@ import {
 import { msg, tr, type MsgKey } from "../../../server/src/i18n";
 import { readPlaylistLink } from "../../../server/src/importLink";
 import * as library from "../../../server/src/library";
-import { findVideoFor, radio, search, suggestions } from "../../../server/src/search";
+import { findVideoFor, radio, search, suggestions, genreRadio} from "../../../server/src/search";
 import { HttpError, VIDEO_ID } from "../../../server/src/types";
 import { getLang, getT } from "../i18n";
 import { ApiError, type MusikeApi, type SystemInfo } from "../lib/apiTypes";
@@ -67,6 +67,7 @@ export const api: MusikeApi = {
     }, signal),
   suggest: (q, signal) => call(() => suggestions(q.trim().slice(0, 100), getLang()).catch(() => []), signal),
   radio: (id) => call(() => radio(id)),
+  genreRadio: (id) => call(() => genreRadio(id)),
   genres: () => call(() => genres(getLang())),
   genre: (id, signal) =>
     call(async () => {
@@ -157,7 +158,15 @@ export async function downloadAudio(id: string, onProgress?: (done: number, tota
         const r = await pcBytes({ url: resolved.url, headers });
         return { status: r.status, headers: r.headers, data: r.bytes.buffer.slice(r.bytes.byteOffset, r.bytes.byteOffset + r.bytes.byteLength) };
       }
-      return CapacitorHttp.request({ url: resolved.url, method: "GET", headers, responseType: "arraybuffer" });
+      // Android's HTTP stack gives up on a stalled piece, which is then retried (see downloadInChunks).
+      return CapacitorHttp.request({
+        url: resolved.url,
+        method: "GET",
+        headers,
+        responseType: "arraybuffer",
+        connectTimeout: 15_000,
+        readTimeout: 30_000,
+      });
     };
     let res = await get();
     // An expired or refused URL: resolve a fresh one once and carry on where we were.

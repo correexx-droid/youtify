@@ -4,7 +4,7 @@ import { create } from "zustand";
 import { downloadAudio } from "../lib/api";
 import type { Library, Track } from "../lib/types";
 import { canTranscode, compressTrack } from "../lib/transcode";
-import { ytfyToBlob } from "../lib/ytfy";
+import { decodeYtfy, encodeYtfy, ytfyToBlob } from "../lib/ytfy";
 import { useLibrary } from "./library";
 
 /**
@@ -28,6 +28,8 @@ export interface OfflineItem {
   savedAt: number;
   /** Imported from the user's own file: kept as long as the library holds the song, never downloaded again. */
   local?: boolean;
+  /** Downloaded and stored as-is; the compression pass still has to shrink it. */
+  pendingCompress?: boolean;
 }
 
 export interface ActiveJob {
@@ -35,6 +37,35 @@ export interface ActiveJob {
   title: string;
   phase: "download" | "compress";
   progress: number;
+  /** Bytes received / expected (download). */
+  received?: number;
+  total?: number | null;
+  startedAt?: number;
+  /** Last time data arrived: a long gap means the connection hangs. */
+  lastDataAt?: number;
+  /** What's going on, in a few words ("waiting for YouTube", "retrying"…). */
+  note?: string;
+}
+
+/** Downloads give up on one song after this and move on (it can be retried with the download button). */
+const SONG_TIMEOUT_MS = 4 * 60_000;
+/** Compressing one song may take this long on a slow phone before the original is simply kept. */
+const COMPRESS_TIMEOUT_MS = 3 * 60_000;
+
+function withTimeout<T>(job: Promise<T>, ms: number, message: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(message)), ms);
+    job.then(
+      (v) => {
+        clearTimeout(timer);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(timer);
+        reject(e);
+      },
+    );
+  });
 }
 
 export const QUALITIES = [
@@ -93,6 +124,10 @@ const deleteSong = (id: string) =>
   tx(["files", "items"], "readwrite", (t) => {
     t.objectStore("files").delete(id);
     t.objectStore("items").delete(id);
+  });
+const putItem = (item: OfflineItem) =>
+  tx(["items"], "readwrite", (t) => {
+    t.objectStore("items").put(item);
   });
 const readFile = (id: string) => tx<Uint8Array | undefined>(["files"], "readonly", (t) => t.objectStore("files").get(id));
 const readItems = () => tx<OfflineItem[]>(["items"], "readonly", (t) => t.objectStore("items").getAll());
@@ -153,6 +188,13 @@ interface OfflineState {
   queue: string[];
   active: ActiveJob | null;
   failed: Record<string, string>;
+  /** Titles of skipped songs, for the downloads panel. */
+  failedTitles: Record<string, string>;
+  /** Songs saved in this session (for the progress counter). */
+  doneThisRun: number;
+  /** Downloads panel open. */
+  panelOpen: boolean;
+  setPanelOpen: (open: boolean) => void;
   pin: (key: PinKey) => void;
   unpin: (key: PinKey) => void;
   /** Download button: (re)tries every song of the collection that isn't on the device yet, skipping failures. */
@@ -175,6 +217,10 @@ export const useOffline = create<OfflineState>((set, get) => ({
   queue: [],
   active: null,
   failed: {},
+  failedTitles: {},
+  doneThisRun: 0,
+  panelOpen: false,
+  setPanelOpen: (panelOpen) => set({ panelOpen }),
   pin: (key) => {
     if (get().pins.includes(key)) return;
     const pins = [...get().pins, key];
@@ -227,7 +273,7 @@ export const useOffline = create<OfflineState>((set, get) => ({
     set({ quality });
   },
   retryFailed: () => {
-    set({ failed: {} });
+    set({ failed: {}, failedTitles: {} });
     sync();
   },
   removeAll: async () => {
@@ -340,6 +386,13 @@ async function work(wanted: Map<string, Track>) {
       await saveOne(track);
       useOffline.setState((st) => ({ queue: st.queue.filter((q) => q !== id) }));
     }
+    // Everything downloaded: now shrink the songs that are still stored as downloaded (first download, then compress).
+    for (;;) {
+      if (syncAgain) break;
+      const pending = Object.values(useOffline.getState().items).find((i) => i.pendingCompress);
+      if (!pending) break;
+      await compressOne(pending);
+    }
   } finally {
     syncing = false;
     useOffline.setState({ active: null });
@@ -350,34 +403,83 @@ async function work(wanted: Map<string, Track>) {
   }
 }
 
-async function saveOne(track: Track) {
-  const setActive = (phase: ActiveJob["phase"], progress: number) =>
-    useOffline.setState({ active: { id: track.id, title: track.title, phase, progress } });
+async function compressOne(item: OfflineItem) {
+  const job: ActiveJob = { id: item.id, title: item.title, phase: "compress", progress: 0, startedAt: Date.now() };
+  useOffline.setState({ active: job });
+  let done: OfflineItem = { ...item, pendingCompress: false };
   try {
-    setActive("download", 0);
-    const { bytes, mime } = await downloadAudio(track.id, (done, total) =>
-      setActive("download", total ? Math.min(1, done / total) : 0),
+    const file = await readFile(item.id);
+    if (!file) throw new Error("missing");
+    const raw = decodeYtfy(file instanceof Uint8Array ? file : new Uint8Array(file as ArrayBuffer));
+    if (raw.codec !== "raw") throw new Error("already compressed");
+    const bitrate = QUALITIES.find((q) => q.id === useOffline.getState().quality)!.bitrate;
+    const result = await withTimeout(
+      compressTrack(raw.bytes, raw.mime, bitrate, (f) => useOffline.setState({ active: { ...job, progress: f } })),
+      COMPRESS_TIMEOUT_MS,
+      "compress timeout",
+    );
+    if (result.codec === "opus" && result.file.length < file.length) {
+      done = { ...done, codec: "opus", stored: result.file.length, bitrate };
+      if (!useOffline.getState().items[item.id]) return;
+      await putSong(done, result.file);
+    } else await putItem(done);
+  } catch {
+    // Compression didn't work out (slow phone, unusual format): the song stays playable as downloaded.
+    await putItem(done).catch(() => {});
+  }
+  if (useOffline.getState().items[item.id]) useOffline.setState((s) => ({ items: { ...s.items, [item.id]: done } }));
+}
+
+async function saveOne(track: Track) {
+  const startedAt = Date.now();
+  let job: ActiveJob = {
+    id: track.id,
+    title: track.title,
+    phase: "download",
+    progress: 0,
+    received: 0,
+    total: null,
+    startedAt,
+    lastDataAt: startedAt,
+    note: "resolving",
+  };
+  const update = (patch: Partial<ActiveJob>) => {
+    job = { ...job, ...patch };
+    useOffline.setState({ active: job });
+  };
+  update({});
+  try {
+    const { bytes, mime } = await withTimeout(
+      downloadAudio(track.id, (done, total) =>
+        update({ received: done, total, progress: total ? Math.min(1, done / total) : 0, lastDataAt: Date.now(), note: undefined }),
+      ),
+      SONG_TIMEOUT_MS,
+      "timeout",
     );
     if (!bytes.length) throw new Error("empty download");
-    setActive("compress", 0);
-    const bitrate = QUALITIES.find((q) => q.id === useOffline.getState().quality)!.bitrate;
-    const { file, codec } = await compressTrack(bytes, mime, bitrate, (f) => setActive("compress", f));
-    // Still wanted after all that work? (It may have been removed from the playlist meanwhile.)
+    // Still wanted after the download? (It may have been removed from the playlist meanwhile.)
     if (!wantedTracks().has(track.id)) return;
+    // Stored as downloaded right away (playable offline now); the compression pass shrinks it afterwards.
+    const file = encodeYtfy({ codec: "raw", mime, bytes });
     const item: OfflineItem = {
       id: track.id,
       title: track.title,
       artist: track.artist,
-      codec,
+      codec: "raw",
       stored: file.length,
       original: bytes.length,
-      bitrate: codec === "opus" ? bitrate : 0,
+      bitrate: 0,
       savedAt: Date.now(),
+      pendingCompress: canTranscode(),
     };
     await putSong(item, file);
-    useOffline.setState((s) => ({ items: { ...s.items, [track.id]: item } }));
+    useOffline.setState((s) => ({ items: { ...s.items, [track.id]: item }, doneThisRun: s.doneThisRun + 1 }));
   } catch (e) {
-    useOffline.setState((s) => ({ failed: { ...s.failed, [track.id]: (e as Error).message || "failed" } }));
+    const message = (e as Error).message || "failed";
+    useOffline.setState((s) => ({
+      failed: { ...s.failed, [track.id]: message },
+      failedTitles: { ...s.failedTitles, [track.id]: `${track.title}${track.artist ? ` – ${track.artist}` : ""}` },
+    }));
   }
 }
 

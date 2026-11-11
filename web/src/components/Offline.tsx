@@ -1,5 +1,5 @@
-import { CheckCircleIcon, DownloadSimpleIcon, TrashIcon, WarningCircleIcon, WifiHighIcon } from "@phosphor-icons/react";
-import { useState } from "react";
+import { ArchiveIcon, CheckCircleIcon, DownloadSimpleIcon, TrashIcon, WarningCircleIcon, WifiHighIcon } from "@phosphor-icons/react";
+import { useEffect, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { useT } from "../i18n";
 import { cn, formatBytes } from "../lib/format";
@@ -56,8 +56,13 @@ export function DownloadButton({ pinKey, name, tracks }: { pinKey: PinKey; name:
         title={failed ? t.offline.skipped(failed) : label}
         disabled={!tracks.length}
         onClick={() => {
+          // While it runs, the button shows what's happening; otherwise it (re)starts the missing songs.
+          if (running) return useOffline.getState().setPanelOpen(true);
           download(pinKey, tracks);
-          if (!complete) toast(t.offline.pinned(name));
+          if (!complete) {
+            toast(t.offline.pinned(name));
+            useOffline.getState().setPanelOpen(true);
+          }
         }}
         className={cn(
           "flex h-11 items-center gap-2 rounded-full px-4 text-sm font-semibold ring-1 transition-[background-color,transform] active:scale-[0.97] disabled:opacity-40",
@@ -235,6 +240,14 @@ export function OfflineSection() {
         )}
       </div>
 
+      <button
+        type="button"
+        onClick={() => useOffline.getState().setPanelOpen(true)}
+        className="h-10 self-start rounded-full bg-surface-1 px-4 text-sm font-medium ring-1 ring-line hover:bg-surface-3"
+      >
+        {t.offline.showDetails}
+      </button>
+
       {totals.count > 0 &&
         (confirm ? (
           <div className="flex items-center justify-between gap-2 rounded-[16px] bg-surface-1 p-3 ring-1 ring-danger/40">
@@ -266,5 +279,155 @@ export function OfflineSection() {
           </button>
         ))}
     </section>
+  );
+}
+
+// ---------------------------------------------------------------- Download progress: indicator and panel
+
+function useTick(on: boolean) {
+  const [, setN] = useState(0);
+  useEffect(() => {
+    if (!on) return;
+    const id = setInterval(() => setN((n) => n + 1), 1000);
+    return () => clearInterval(id);
+  }, [on]);
+}
+
+function useDownloadStatus() {
+  return useOffline(
+    useShallow((s) => ({
+      active: s.active,
+      queue: s.queue.filter((id) => !s.items[id] && !s.failed[id] && id !== s.active?.id).length,
+      compressing: Object.values(s.items).filter((i) => i.pendingCompress).length,
+      skipped: Object.keys(s.failed).length,
+      doneThisRun: s.doneThisRun,
+      waitingForWifi: s.waitingForWifi,
+    })),
+  );
+}
+
+/** Small pill above the player while songs are downloading or compressing; opens the panel. */
+export function DownloadIndicator() {
+  const t = useT();
+  const st = useDownloadStatus();
+  const setPanelOpen = useOffline((s) => s.setPanelOpen);
+  if (!offlineSupported) return null;
+  const busy = !!st.active || st.queue > 0 || st.compressing > 0;
+  if (!busy && !st.waitingForWifi) return null;
+  const pct = st.active ? Math.round(st.active.progress * 100) : 0;
+  const text = st.waitingForWifi
+    ? t.offline.waitingWifi
+    : st.active?.phase === "compress"
+      ? t.offline.pillCompress(st.compressing, pct)
+      : t.offline.pillDownload(st.doneThisRun + 1, st.doneThisRun + st.queue + (st.active ? 1 : 0), pct);
+  return (
+    <button
+      type="button"
+      onClick={() => setPanelOpen(true)}
+      className="fixed right-3 bottom-[calc(150px+env(safe-area-inset-bottom))] z-30 flex items-center gap-2 rounded-full bg-surface-2/95 py-2 pr-4 pl-2.5 text-xs font-semibold shadow-[0_8px_28px_rgb(0_0_0/0.45)] ring-1 ring-accent/40 backdrop-blur md:right-4 md:bottom-[112px]"
+    >
+      <span className="relative grid size-7 place-items-center rounded-full bg-accent text-accent-ink">
+        {st.waitingForWifi ? (
+          <WifiHighIcon size={15} weight="bold" />
+        ) : st.active?.phase === "compress" ? (
+          <ArchiveIcon size={15} weight="bold" />
+        ) : (
+          <DownloadSimpleIcon size={15} weight="bold" className="animate-bounce" />
+        )}
+      </span>
+      {text}
+    </button>
+  );
+}
+
+const mb = (n: number) => `${(n / 1024 / 1024).toFixed(1).replace(".", ",")} MB`;
+
+/** Everything about the downloads: current song with speed and stall detection, counters, skipped songs. */
+export function DownloadsPanel() {
+  const t = useT();
+  const open = useOffline((s) => s.panelOpen);
+  const setPanelOpen = useOffline((s) => s.setPanelOpen);
+  const st = useDownloadStatus();
+  const failed = useOffline((s) => s.failed);
+  const failedTitles = useOffline((s) => s.failedTitles);
+  const retryFailed = useOffline((s) => s.retryFailed);
+  useTick(open && !!st.active);
+  const a = st.active;
+  const now = Date.now();
+  const stalledFor = a?.phase === "download" && a.lastDataAt ? Math.floor((now - a.lastDataAt) / 1000) : 0;
+  const elapsed = a?.startedAt ? Math.max(1, (now - a.startedAt) / 1000) : 1;
+  const speed = a?.received ? a.received / elapsed : 0;
+  const reason = (r: string) =>
+    r === "timeout" ? t.offline.reasonTimeout : /HTTP 403|HTTP 410/.test(r) ? t.offline.reasonRefused : /HTTP/.test(r) ? r : t.offline.reasonOther;
+
+  return (
+    <Modal open={open} onClose={() => setPanelOpen(false)} title={t.offline.panelTitle}>
+      <div className="flex flex-col gap-4">
+        {a ? (
+          <div className="flex flex-col gap-2 rounded-[16px] bg-surface-1 p-4 ring-1 ring-line">
+            <p className="text-xs font-semibold tracking-[0.12em] text-accent-text uppercase">
+              {a.phase === "download" ? t.offline.phaseDownloadTitle : t.offline.phaseCompressTitle}
+            </p>
+            <p className="truncate font-semibold">{a.title}</p>
+            <span className="h-2 overflow-hidden rounded-full bg-surface-4">
+              <span
+                className={cn("block h-full rounded-full bg-accent transition-[width]", a.phase === "download" && !a.total && "w-1/3 animate-pulse")}
+                style={a.total || a.phase === "compress" ? { width: `${Math.round(a.progress * 100)}%` } : undefined}
+              />
+            </span>
+            <p className="text-xs text-fg-2">
+              {a.phase === "download"
+                ? a.note === "resolving" && !a.received
+                  ? t.offline.resolving
+                  : `${mb(a.received ?? 0)}${a.total ? ` / ${mb(a.total)}` : ""} · ${Math.round(speed / 1024)} KB/s`
+                : t.offline.compressing(Math.round(a.progress * 100))}
+            </p>
+            {stalledFor >= 10 && (
+              <p className="flex items-center gap-1.5 text-xs text-danger">
+                <WarningCircleIcon size={14} /> {t.offline.stalled(stalledFor)}
+              </p>
+            )}
+          </div>
+        ) : (
+          <p className="text-sm text-fg-2">{st.waitingForWifi ? t.offline.waitingWifiLong(st.queue) : t.offline.idle}</p>
+        )}
+
+        <ul className="grid grid-cols-2 gap-2 text-sm">
+          {[
+            [t.offline.statDone, st.doneThisRun],
+            [t.offline.statWaiting, st.queue],
+            [t.offline.statCompress, st.compressing],
+            [t.offline.statSkipped, st.skipped],
+          ].map(([label, n]) => (
+            <li key={label as string} className="rounded-[14px] bg-surface-1 px-3 py-2 ring-1 ring-line">
+              <span className="block text-lg font-bold">{n}</span>
+              <span className="text-xs text-fg-2">{label}</span>
+            </li>
+          ))}
+        </ul>
+        <p className="text-xs text-fg-3">{t.offline.orderHint}</p>
+
+        {st.skipped > 0 && (
+          <div className="flex flex-col gap-2">
+            <p className="text-sm font-semibold">{t.offline.skippedTitle}</p>
+            <ul className="flex max-h-40 flex-col gap-1 overflow-y-auto text-xs">
+              {Object.entries(failed).map(([id, r]) => (
+                <li key={id} className="flex justify-between gap-3 rounded-lg bg-surface-1 px-3 py-1.5">
+                  <span className="truncate">{failedTitles[id] ?? id}</span>
+                  <span className="shrink-0 text-danger">{reason(r)}</span>
+                </li>
+              ))}
+            </ul>
+            <button
+              type="button"
+              onClick={retryFailed}
+              className="h-10 self-start rounded-full bg-accent px-4 text-sm font-semibold text-accent-ink"
+            >
+              {t.offline.retrySkipped}
+            </button>
+          </div>
+        )}
+      </div>
+    </Modal>
   );
 }

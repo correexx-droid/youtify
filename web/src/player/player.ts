@@ -40,6 +40,8 @@ interface PlayerState {
   preferVideo: boolean;
   quality: Quality;
   autoRadio: boolean;
+  /** Genre mix: random songs in the style of the song that started it, topped up as they play. */
+  genreMix: boolean;
 
   playList: (tracks: Track[], start?: number) => void;
   playTrack: (track: Track) => void;
@@ -60,6 +62,7 @@ interface PlayerState {
   setPreferVideo: (on: boolean) => void;
   setQuality: (q: Quality) => void;
   setAutoRadio: (on: boolean) => void;
+  toggleGenreMix: () => Promise<void>;
 }
 
 // Media elements live outside React so playback survives any re-render or route change.
@@ -93,6 +96,28 @@ interface Saved {
   preferVideo: boolean;
   quality: Quality;
   autoRadio: boolean;
+  genreMix?: boolean;
+  mixIds?: string[];
+  mixSeeds?: string[];
+}
+
+/** Songs the genre mix put in the queue (so turning it off takes exactly those out again). */
+const mixIds = new Set<string>();
+/** Songs whose "radio" (same style/genre on YouTube Music) the mix draws from. */
+let mixSeeds: string[] = [];
+let mixLoading = false;
+/** What was queued after the current song when the mix started; it comes back when the mix is turned off. */
+let mixParked: Track[] = [];
+{
+  try {
+    const raw = JSON.parse(localStorage.getItem("musike:player") ?? "{}") as Partial<Saved>;
+    if (raw.genreMix) {
+      for (const id of raw.mixIds ?? []) mixIds.add(id);
+      mixSeeds = raw.mixSeeds ?? [];
+    }
+  } catch {
+    /* nothing saved */
+  }
 }
 
 function readSaved(): Partial<Saved> {
@@ -253,8 +278,37 @@ export const usePlayer = create<PlayerState>((set, get) => {
     }
   }
 
+  /** Adds shuffled songs in the mix's style: from the radio of the seed or of a song the mix already played. */
+  async function topUpMix(force = false) {
+    const s = get();
+    if (!s.genreMix || mixLoading) return;
+    if (!force && s.queue.length - s.index - 1 >= 3) return;
+    const seeds = mixSeeds.length ? mixSeeds : [];
+    if (!seeds.length) return;
+    mixLoading = true;
+    try {
+      // Mostly the original seed keeps the genre; now and then a played mix song adds variety.
+      const seed = Math.random() < 0.6 ? seeds[0]! : seeds[Math.floor(Math.random() * seeds.length)]!;
+      const known = new Set(get().queue.map((t) => t.id));
+      const more = shuffled((await api.genreRadio(seed)).filter((t) => !known.has(t.id) && t.kind !== "local")).slice(0, 15);
+      if (!get().genreMix || !more.length) return;
+      for (const t of more) mixIds.add(t.id);
+      set((st) => ({ queue: [...st.queue, ...more], original: st.original ? [...st.original, ...more] : null }));
+    } catch {
+      /* try again with the next song */
+    } finally {
+      mixLoading = false;
+    }
+  }
+
   function onStarted() {
     const s = get();
+    if (s.genreMix) {
+      const track = s.queue[s.index];
+      // Songs the mix played become seeds too (at most a few, so the style doesn't drift far).
+      if (track && mixIds.has(track.id) && !mixSeeds.includes(track.id)) mixSeeds = [...mixSeeds, track.id].slice(-6);
+      void topUpMix();
+    }
     const track = s.queue[s.index];
     if (!track || recordedToken === token) return;
     recordedToken = token;
@@ -278,6 +332,7 @@ export const usePlayer = create<PlayerState>((set, get) => {
     }
     if (s.index < s.queue.length - 1) return load(s.index + 1);
     if (s.repeat === "all" && s.queue.length) return load(0);
+    if (s.genreMix) return void topUpMix(true).then(() => (get().index < get().queue.length - 1 ? load(get().index + 1) : undefined));
     if (s.autoRadio) return void continueWithRadio();
     set({ status: "paused", position: 0 });
   }
@@ -398,6 +453,7 @@ export const usePlayer = create<PlayerState>((set, get) => {
     preferVideo: capabilities.video && (saved.preferVideo ?? false),
     quality: saved.quality ?? "sd",
     autoRadio: saved.autoRadio ?? true,
+    genreMix: saved.genreMix ?? false,
 
     playList: (tracks, start = 0) => {
       if (!tracks.length) return;
@@ -568,6 +624,35 @@ export const usePlayer = create<PlayerState>((set, get) => {
     },
 
     setAutoRadio: (autoRadio) => set({ autoRadio }),
+
+    toggleGenreMix: async () => {
+      const s = get();
+      const t = getT();
+      if (s.genreMix) {
+        // Off: take the mix's upcoming songs out again, keep what was queued by hand.
+        const kept = s.queue.filter((tr, i) => i <= s.index || !mixIds.has(tr.id));
+        const ids = new Set(kept.map((tr) => tr.id));
+        const keep = [...kept, ...mixParked.filter((tr) => !ids.has(tr.id))];
+        mixIds.clear();
+        mixSeeds = [];
+        mixParked = [];
+        set({ genreMix: false, queue: keep, original: null, shuffle: false });
+        toast(t.player.genreMixOff);
+        return;
+      }
+      const current = s.queue[s.index];
+      const seed = current?.kind === "local" ? s.queue.slice(0, s.index).reverse().find((tr) => tr.kind !== "local") : current;
+      if (!seed) {
+        toast(t.player.genreMixNeedsSong);
+        return;
+      }
+      mixSeeds = [seed.id];
+      mixParked = s.queue.slice(s.index + 1);
+      set({ genreMix: true, queue: s.queue.slice(0, s.index + 1), original: null, shuffle: false });
+      toast(t.player.genreMixOn(seed.title));
+      // Replace what's coming next with the mix (hand-queued songs that were already upcoming stay in front).
+      await topUpMix(true);
+    },
   };
 });
 
@@ -594,6 +679,9 @@ function persist() {
     preferVideo: s.preferVideo,
     quality: s.quality,
     autoRadio: s.autoRadio,
+    genreMix: s.genreMix,
+    mixIds: [...mixIds].slice(-500),
+    mixSeeds,
   };
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));

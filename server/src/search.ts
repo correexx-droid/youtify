@@ -230,6 +230,36 @@ function pickClip(candidates: Track[], title: string, artist: string, duration: 
 }
 
 /** YouTube Music "radio" for a track: related songs to continue playback. */
+/** Long compilations ("Top 100", "1 hour mix", full albums) don't belong in a song mix. */
+const NOT_A_SONG = /\b(top\s?\d{2,}|full album|playlist|compilation|non[- ]?stop|mix\s?20\d\d|\d+\s?(hours?|stunden)|best of)\b/i;
+
+/**
+ * Songs in the same genre as `id`: YouTube's related videos for the song (they stay close to its style), topped
+ * up with YouTube Music's radio. Only single songs between 1½ and 12 minutes.
+ */
+export async function genreRadio(id: string): Promise<Track[]> {
+  const { lockupTrack } = await import("./importLink.js");
+  const seen = new Set<string>([id]);
+  const out: Track[] = [];
+  const add = (t: Track | null) => {
+    if (!t || seen.has(t.id) || NOT_A_SONG.test(t.title)) return;
+    if (t.duration && (t.duration < 90 || t.duration > 12 * 60)) return;
+    seen.add(t.id);
+    out.push(t);
+  };
+  await withClient(async (yt) => {
+    try {
+      const info: any = await yt.getInfo(id);
+      for (const item of info?.watch_next_feed ?? []) add(lockupTrack(item) ?? toTrack(item, "video"));
+    } catch {
+      /* fall back to the radio below */
+    }
+  });
+  // YouTube Music's radio only as a last resort: it drifts far from the genre without a listening history.
+  if (out.length < 4) for (const t of await radio(id).catch(() => [])) add(t);
+  return out;
+}
+
 export async function radio(id: string): Promise<Track[]> {
   const panel = await withClient((yt) => yt.music.getUpNext(id, true));
   return (panel.contents ?? [])

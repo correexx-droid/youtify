@@ -54,7 +54,7 @@ ipcMain.handle("youtify:net", async (_e, req: RawRequest) => {
 
 ipcMain.handle("youtify:bytes", async (_e, req: { url: string; headers: Record<string, string> }) => {
   if (!allowed(req.url)) throw new Error("blocked");
-  const res = await fetch(req.url, { headers: req.headers, redirect: "follow" });
+  const res = await fetch(req.url, { headers: req.headers, redirect: "follow", signal: AbortSignal.timeout(45_000) });
   return { status: res.status, headers: headersOf(res), bytes: new Uint8Array(await res.arrayBuffer()) };
 });
 

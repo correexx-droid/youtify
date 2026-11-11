@@ -4,7 +4,7 @@ import { useT } from "../i18n";
 import { selectCurrent, usePlayer, useStatusText } from "../player/player";
 import { useUi } from "../stores/ui";
 import { Artwork } from "./Artwork";
-import { FavoriteButton, ModeSwitch, Scrubber, Transport, Volume } from "./Controls";
+import { FavoriteButton, ModeSwitch, Scrubber, Transport, Volume, GenreMixToggle } from "./Controls";
 import { IconButton } from "./IconButton";
 
 /** Desktop and tablet player: a floating island under the content. */
@@ -55,6 +55,7 @@ export function PlayerBar() {
 
         <div className="flex items-center justify-end gap-1">
           <ModeSwitch className="max-2xl:hidden" />
+          <GenreMixToggle compact />
           <IconButton
             label={t.nowPlaying.showLyrics}
             size="sm"

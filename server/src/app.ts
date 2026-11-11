@@ -7,7 +7,7 @@ import { ALBUM_ID, album, ARTIST_ID, artist, GENRE_ID, genre, genreArtists, genr
 import { config } from "./config.js";
 import * as library from "./library.js";
 import { fileStorage } from "./libraryFile.js";
-import { findVideoFor, radio, search, suggestions } from "./search.js";
+import { findVideoFor, genreRadio, radio, search, suggestions } from "./search.js";
 import { proxyStream, serveFile } from "./stream.js";
 import { langOf, msg, tr } from "./i18n.js";
 import { presentJob, startJob, systemInfo, type Channel } from "./system.js";
@@ -80,6 +80,8 @@ export async function startServer(opts: StartOptions = {}): Promise<RunningServe
   });
 
   app.get("/api/radio/:id", async (req) => ({ tracks: await radio(videoId(req.params)) }));
+  /** Genre mix: songs in the same genre (related songs on YouTube). */
+  app.get("/api/genre-radio/:id", async (req) => ({ tracks: await genreRadio(videoId(req.params)) }));
 
   // Browse by genre: genre → its artists or all its songs → an artist's top songs
 

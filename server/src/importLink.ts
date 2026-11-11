@@ -59,7 +59,7 @@ function clock(v: string): number {
 }
 
 /** YouTube's newer playlist rows ("LockupView") carry the video id, title, channel and length in other places. */
-function lockupTrack(item: any): Track | null {
+export function lockupTrack(item: any): Track | null {
   if (item?.type !== "LockupView" || item.content_type !== "VIDEO") return null;
   const id = String(item.content_id ?? "");
   if (!/^[\w-]{11}$/.test(id)) return null;

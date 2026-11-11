@@ -16,7 +16,7 @@ import type { Track } from "../lib/types";
 import { selectCurrent, usePlayer, useStatusText } from "../player/player";
 import { useUi, type PanelTab } from "../stores/ui";
 import { Artwork } from "./Artwork";
-import { FavoriteButton, ModeSwitch, Scrubber, Transport } from "./Controls";
+import { FavoriteButton, ModeSwitch, Scrubber, Transport, GenreMixToggle } from "./Controls";
 import { IconButton } from "./IconButton";
 import { LyricsCard, LyricsView } from "./Lyrics";
 import { QueueList } from "./Queue";
@@ -107,6 +107,7 @@ function PanelBody({ tab, slot }: { tab: PanelTab; slot: number }) {
       <Stage track={track} slot={slot} />
       <TrackHeading track={track} />
       <ModeSwitch />
+      <GenreMixToggle />
       <LyricsCard track={track} onOpen={() => openPanel("lyrics")} />
       {track.kind !== "local" && (
       <button
@@ -343,6 +344,7 @@ export function NowPlayingSheet({ open, onClose }: { open: boolean; onClose: () 
                   <Scrubber touch />
                   <Transport big />
                   <ModeSwitch className="justify-center" />
+                  <GenreMixToggle />
                 </div>
               </div>
             )}

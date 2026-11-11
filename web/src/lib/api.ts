@@ -44,6 +44,7 @@ export const api: MusikeApi = {
   suggest: (q: string, signal?: AbortSignal) =>
     request<{ suggestions: string[] }>(`/api/suggest?q=${encodeURIComponent(q)}`, { signal }).then((r) => r.suggestions),
   radio: (id: string) => request<{ tracks: Track[] }>(`/api/radio/${id}`).then((r) => r.tracks),
+  genreRadio: (id: string) => request<{ tracks: Track[] }>(`/api/genre-radio/${id}`).then((r) => r.tracks),
   genres: () => request<{ genres: Genre[] }>("/api/genres").then((r) => r.genres),
   genre: (id: string, signal?: AbortSignal) => request<GenrePage>(`/api/genres/${encodeURIComponent(id)}`, { signal }),
   genreArtists: (id: string, offset: number) =>
@@ -99,7 +100,11 @@ export const streamSource = (id: string, kind: "audio" | "video", quality: "sd" 
 /** The whole audio of a track, for offline listening (through the server's stream proxy, in ranged pieces). */
 export function downloadAudio(id: string, onProgress?: (done: number, total: number | null) => void) {
   return downloadInChunks(async (start, end) => {
-    const res = await fetch(`/api/stream/${id}/audio`, { headers: { Range: `bytes=${start}-${end}`, [LANG_HEADER]: getLang() } });
+    // A piece that sends nothing for 30 s is cut off and retried (see downloadInChunks).
+    const res = await fetch(`/api/stream/${id}/audio`, {
+      headers: { Range: `bytes=${start}-${end}`, [LANG_HEADER]: getLang() },
+      signal: AbortSignal.timeout(30_000),
+    });
     if (!res.ok && res.status !== 416) {
       const body = await res.json().catch(() => ({}));
       throw new ApiError(res.status, body.error ?? getT().player.httpError(res.status), body.code);

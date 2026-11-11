@@ -5,6 +5,7 @@ import {
   PlayIcon,
   RepeatIcon,
   RepeatOnceIcon,
+  ShuffleAngularIcon,
   ShuffleIcon,
   SkipBackIcon,
   SkipForwardIcon,
@@ -207,5 +208,50 @@ export function ModeSwitch({ className }: { className?: string }) {
         </button>
       )}
     </div>
+  );
+}
+
+/** Genre mix on/off: random songs in the genre of the song playing. A pill with a switch, or a compact icon. */
+export function GenreMixToggle({ compact = false, className }: { compact?: boolean; className?: string }) {
+  const t = useT();
+  const on = usePlayer((s) => s.genreMix);
+  const hasTrack = usePlayer((s) => s.queue.length > 0);
+  const toggleGenreMix = usePlayer((s) => s.toggleGenreMix);
+  if (compact)
+    return (
+      <IconButton
+        label={`${t.player.genreMix}: ${t.player.genreMixHint}`}
+        size="sm"
+        active={on}
+        disabled={!hasTrack && !on}
+        onClick={() => void toggleGenreMix()}
+        className={className}
+      >
+        <ShuffleAngularIcon size={18} weight={on ? "bold" : "regular"} />
+        {on && <span className="absolute bottom-0.5 size-1 rounded-full bg-accent-text" />}
+      </IconButton>
+    );
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      disabled={!hasTrack && !on}
+      onClick={() => void toggleGenreMix()}
+      className={cn(
+        "flex w-full items-center gap-3 rounded-[16px] px-4 py-3 text-left ring-1 transition-colors disabled:opacity-50",
+        on ? "bg-accent-soft ring-accent/40" : "bg-surface-3/50 ring-line hover:bg-surface-3",
+        className,
+      )}
+    >
+      <ShuffleAngularIcon size={20} className={on ? "text-accent-text" : "text-fg-2"} weight={on ? "bold" : "regular"} />
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-semibold">{t.player.genreMix}</span>
+        <span className="block truncate text-xs text-fg-2">{t.player.genreMixHint}</span>
+      </span>
+      <span className={cn("relative h-6 w-11 shrink-0 rounded-full transition-colors", on ? "bg-accent" : "bg-surface-4")}>
+        <span className={cn("absolute top-0.5 size-5 rounded-full bg-white shadow transition-transform", on ? "translate-x-[22px]" : "translate-x-0.5")} />
+      </span>
+    </button>
   );
 }
