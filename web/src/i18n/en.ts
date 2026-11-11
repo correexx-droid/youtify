@@ -200,6 +200,11 @@ export const en = {
     active: "Active: whole playlists are copied",
   },
 
+  playlistMenu: {
+    actionsFor: (name: string) => `Actions for ${name}`,
+    more: "More options",
+  },
+
   importFiles: {
     button: "Import music",
     title: "Import your own music",

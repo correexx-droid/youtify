@@ -9,6 +9,7 @@ import {
 } from "@phosphor-icons/react";
 import { useState, type ReactNode } from "react";
 import { NavLink, useNavigate } from "react-router";
+import { playlistContextMenu } from "./PlaylistMenu";
 import { useT } from "../i18n";
 import { cn } from "../lib/format";
 import { paths } from "../lib/routes";
@@ -56,10 +57,26 @@ function SettingsButton() {
 }
 
 /** Shared tile: square icon/art with an active Volt ring. Labels appear on the expanded rail (≥1280px). */
-function RailLink({ to, label, sub, end, children }: { to: string; label: string; sub?: string; end?: boolean; children: ReactNode }) {
+function RailLink({
+  to,
+  label,
+  sub,
+  end,
+  children,
+  playlistId,
+}: {
+  to: string;
+  label: string;
+  sub?: string;
+  end?: boolean;
+  children: ReactNode;
+  /** Right-click opens the playlist's menu. */
+  playlistId?: string;
+}) {
   return (
     <NavLink
       to={to}
+      onContextMenu={playlistId ? playlistContextMenu(playlistId) : undefined}
       end={end}
       title={label}
       className={({ isActive }) =>
@@ -162,7 +179,7 @@ export function Rail() {
             </span>
           </RailLink>
           {sidebarPlaylists && playlists.map((p) => (
-            <RailLink key={p.id} to={paths.playlist(p.id)} label={p.name} sub={t.common.tracks(p.tracks.length)}>
+            <RailLink key={p.id} to={paths.playlist(p.id)} label={p.name} sub={t.common.tracks(p.tracks.length)} playlistId={p.id}>
               <Artwork src={p.tracks[0]?.thumb} className="size-full" iconSize={18} />
             </RailLink>
           ))}

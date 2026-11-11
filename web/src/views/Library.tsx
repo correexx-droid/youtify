@@ -10,14 +10,31 @@ import { useT } from "../i18n";
 import { paths } from "../lib/routes";
 import type { Track } from "../lib/types";
 import { IconButton } from "../components/IconButton";
+import { playlistContextMenu, PlaylistMenuButton } from "../components/PlaylistMenu";
 import { useLibrary } from "../stores/library";
 import { useUi } from "../stores/ui";
 
-function Entry({ to, name, kind, tracks, sub }: { to: string; name: string; kind: CoverKind; tracks: Track[]; sub: string }) {
+function Entry({
+  to,
+  name,
+  kind,
+  tracks,
+  sub,
+  playlistId,
+}: {
+  to: string;
+  name: string;
+  kind: CoverKind;
+  tracks: Track[];
+  sub: string;
+  /** Playlists get a menu (right-click, or the ⋮ button). */
+  playlistId?: string;
+}) {
   return (
-    <li>
+    <li className="group/entry relative">
       <Link
         to={to}
+        onContextMenu={playlistId ? playlistContextMenu(playlistId) : undefined}
         className="group flex items-center gap-3 rounded-[16px] p-2 transition-colors hover:bg-surface-2 md:flex-col md:items-stretch md:gap-3 md:p-3"
       >
         <Cover
@@ -26,11 +43,19 @@ function Entry({ to, name, kind, tracks, sub }: { to: string; name: string; kind
           iconSize={26}
           className="size-16 shrink-0 rounded-[12px] md:aspect-square md:size-auto md:w-full md:rounded-[14px] md:shadow-[0_12px_32px_rgb(0_0_0/0.3)]"
         />
-        <span className="min-w-0">
+        <span className={playlistId ? "min-w-0 pr-10 md:pr-0" : "min-w-0"}>
           <span className="block truncate font-medium">{name}</span>
           <span className="block truncate text-sm text-fg-2">{sub}</span>
         </span>
       </Link>
+      {playlistId && (
+        // Always visible on phones; on wide screens it shows on hover (right-click works too).
+        <PlaylistMenuButton
+          id={playlistId}
+          name={name}
+          className="absolute top-1/2 right-1 -translate-y-1/2 md:top-5 md:right-5 md:translate-y-0 md:bg-bg/70 md:text-fg md:opacity-0 md:backdrop-blur md:group-hover/entry:opacity-100 md:focus-visible:opacity-100"
+        />
+      )}
     </li>
   );
 }
@@ -78,6 +103,7 @@ export default function Library() {
             kind="playlist"
             tracks={p.tracks}
             sub={t.library.playlistSub(p.tracks.length)}
+            playlistId={p.id}
           />
         ))}
       </ul>
@@ -87,6 +113,7 @@ export default function Library() {
           {t.library.noPlaylists}
         </p>
       )}
+
 
       <NamePlaylistDialog
         open={creating}

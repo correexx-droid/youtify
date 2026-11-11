@@ -194,6 +194,11 @@ export const de: Messages = {
     active: "Aktiv: Ganze Playlists werden kopiert",
   },
 
+  playlistMenu: {
+    actionsFor: (name) => `Aktionen für ${name}`,
+    more: "Weitere Optionen",
+  },
+
   importFiles: {
     button: "Musik importieren",
     title: "Eigene Musik importieren",
