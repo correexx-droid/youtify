@@ -268,6 +268,16 @@ export const de: Messages = {
     removedAll: "Alle Downloads gelöscht.",
     noReencode: "Dieses Gerät kann Audio nicht neu kodieren, daher werden Songs in Originalgröße gespeichert.",
     waitingOnline: "Wartet auf eine Internetverbindung.",
+    waitingWifi: "Wartet auf WLAN",
+    waitingWifiLong: (n) => `${n} ${n === 1 ? "Song wartet" : "Songs warten"} auf WLAN (mobile Daten werden nicht genutzt).`,
+    wifiOnly: "Nur über WLAN herunterladen",
+    retryMissing: (n) => `${n} fehlende laden`,
+    skipped: (n) => `${n} ${n === 1 ? "Song konnte" : "Songs konnten"} nicht geladen werden und ${n === 1 ? "wurde" : "wurden"} übersprungen. Nochmal drücken, um es erneut zu versuchen.`,
+    removeDownloads: "Downloads löschen",
+    removeDownloadsX: (name) => `Downloads von ${name} löschen`,
+    removeDownloadsTitle: "Downloads löschen?",
+    removeDownloadsBody: (name) =>
+      `Die heruntergeladenen Songs von „${name}" werden von diesem Gerät gelöscht. Die Playlist selbst bleibt, und Songs, die auch in einer anderen heruntergeladenen Playlist sind, bleiben erhalten.`,
   },
 
   lyrics: {

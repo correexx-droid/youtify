@@ -249,6 +249,10 @@ export function SettingsDialog() {
           )}
         </section>
         )}
+
+        <p className="pt-2 pb-1 text-center text-xs text-fg-3">
+          YoutiFy {__APP_VERSION__.replace(/\.0$/, "")} · <span className="font-semibold text-accent-text">Made by Kai A.</span>
+        </p>
       </div>
     </Modal>
   );

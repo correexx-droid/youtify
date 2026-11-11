@@ -274,6 +274,16 @@ export const en = {
     removedAll: "All downloads deleted.",
     noReencode: "This device can't re-encode audio, so songs are stored at their original size.",
     waitingOnline: "Waiting for a connection to continue.",
+    waitingWifi: "Waiting for Wi-Fi",
+    waitingWifiLong: (n: number) => `${n} ${n === 1 ? "song waits" : "songs wait"} for Wi-Fi (mobile data isn't used).`,
+    wifiOnly: "Download over Wi-Fi only",
+    retryMissing: (n: number) => `Download ${n} missing`,
+    skipped: (n: number) => `${n} ${n === 1 ? "song" : "songs"} couldn't be downloaded and were skipped. Press again to retry.`,
+    removeDownloads: "Delete downloads",
+    removeDownloadsX: (name: string) => `Delete the downloads of ${name}`,
+    removeDownloadsTitle: "Delete downloads?",
+    removeDownloadsBody: (name: string) =>
+      `The downloaded songs of "${name}" are removed from this device. The playlist itself stays, and songs that are also in another downloaded playlist are kept.`,
   },
 
   lyrics: {

@@ -1,3 +1,5 @@
+import { Capacitor } from "@capacitor/core";
+import { Network } from "@capacitor/network";
 import { create } from "zustand";
 import { downloadAudio } from "../lib/api";
 import type { Library, Track } from "../lib/types";
@@ -43,6 +45,7 @@ export const QUALITIES = [
 export type Quality = (typeof QUALITIES)[number]["id"];
 
 const PINS_KEY = "youtify:offline-pins";
+const WIFI_KEY = "youtify:offline-wifi-only";
 const QUALITY_KEY = "youtify:offline-quality";
 
 /** iOS plays through a native player that can't open in-page files, so offline songs aren't offered there. */
@@ -94,6 +97,30 @@ const deleteSong = (id: string) =>
 const readFile = (id: string) => tx<Uint8Array | undefined>(["files"], "readonly", (t) => t.objectStore("files").get(id));
 const readItems = () => tx<OfflineItem[]>(["items"], "readonly", (t) => t.objectStore("items").getAll());
 
+// ---------------------------------------------------------------- Wi-Fi
+
+/** On a phone, downloads wait for Wi-Fi (mobile data stays untouched) unless the user turns that off. */
+const onPhone = Capacitor.isNativePlatform();
+
+function readWifiOnly(): boolean {
+  try {
+    const v = localStorage.getItem(WIFI_KEY);
+    return v === null ? onPhone : v === "1";
+  } catch {
+    return onPhone;
+  }
+}
+
+/** "wifi", "cellular", "none" or "unknown" (PCs and browsers that don't say). */
+let connection: "wifi" | "cellular" | "none" | "unknown" = "unknown";
+
+function canDownloadNow(): boolean {
+  if (!navigator.onLine || connection === "none") return false;
+  if (!useOffline.getState().wifiOnly) return true;
+  // Only a connection known to be mobile data is held back; Ethernet/unknown (PCs) count as fine.
+  return connection !== "cellular";
+}
+
 // ---------------------------------------------------------------- Store
 
 function readPins(): PinKey[] {
@@ -118,12 +145,21 @@ interface OfflineState {
   items: Record<string, OfflineItem>;
   pins: PinKey[];
   quality: Quality;
+  /** Download only over Wi-Fi (default on phones). */
+  wifiOnly: boolean;
+  /** True while downloads wait because the phone is on mobile data. */
+  waitingForWifi: boolean;
   /** Songs waiting to be downloaded, in order. */
   queue: string[];
   active: ActiveJob | null;
   failed: Record<string, string>;
   pin: (key: PinKey) => void;
   unpin: (key: PinKey) => void;
+  /** Download button: (re)tries every song of the collection that isn't on the device yet, skipping failures. */
+  download: (key: PinKey, tracks: Track[]) => void;
+  /** Delete button: removes the collection's downloads, keeping songs another downloaded collection still holds. */
+  removeDownloads: (key: PinKey) => void;
+  setWifiOnly: (on: boolean) => void;
   setQuality: (q: Quality) => void;
   retryFailed: () => void;
   removeAll: () => Promise<void>;
@@ -134,6 +170,8 @@ export const useOffline = create<OfflineState>((set, get) => ({
   items: {},
   pins: readPins(),
   quality: readQuality(),
+  wifiOnly: readWifiOnly(),
+  waitingForWifi: false,
   queue: [],
   active: null,
   failed: {},
@@ -150,6 +188,34 @@ export const useOffline = create<OfflineState>((set, get) => ({
     const pins = get().pins.filter((k) => k !== key);
     savePins(pins);
     set({ pins });
+    sync();
+  },
+  download: (key, tracks) => {
+    // Songs that failed before get another chance; the ones that fail again are skipped.
+    const ids = new Set(tracks.map((t) => t.id));
+    set((s) => ({ failed: Object.fromEntries(Object.entries(s.failed).filter(([id]) => !ids.has(id))) }));
+    if (!get().pins.includes(key)) {
+      const pins = [...get().pins, key];
+      savePins(pins);
+      set({ pins });
+      void navigator.storage?.persist?.().catch(() => {});
+    }
+    sync();
+  },
+  removeDownloads: (key) => {
+    const pins = get().pins.filter((k) => k !== key);
+    savePins(pins);
+    set({ pins });
+    // sync() deletes every song no remaining downloaded collection (or own import) needs.
+    sync();
+  },
+  setWifiOnly: (wifiOnly) => {
+    try {
+      localStorage.setItem(WIFI_KEY, wifiOnly ? "1" : "0");
+    } catch {
+      /* private mode */
+    }
+    set({ wifiOnly });
     sync();
   },
   setQuality: (quality) => {
@@ -246,7 +312,7 @@ function sync() {
   }
 
   const queue = [...wanted.keys()].filter((id) => !id.startsWith("lo_") && !state.items[id] && !state.failed[id]);
-  useOffline.setState({ queue });
+  useOffline.setState(queue.length ? { queue } : { queue, waitingForWifi: false });
   void work(wanted);
 }
 
@@ -260,7 +326,12 @@ async function work(wanted: Map<string, Track>) {
     for (;;) {
       const s = useOffline.getState();
       const id = s.queue.find((q) => !s.items[q] && !s.failed[q]);
-      if (!id || !navigator.onLine) break;
+      if (!id) break;
+      if (!canDownloadNow()) {
+        useOffline.setState({ waitingForWifi: navigator.onLine && connection !== "none" });
+        break;
+      }
+      useOffline.setState({ waitingForWifi: false });
       const track = wantedTracks().get(id) ?? wanted.get(id);
       if (!track) {
         useOffline.setState((st) => ({ queue: st.queue.filter((q) => q !== id) }));
@@ -463,4 +534,15 @@ if (offlineSupported) {
     if (s.favorites !== prev.favorites || s.playlists !== prev.playlists || s.status !== prev.status) sync();
   });
   addEventListener("online", () => sync());
+  // Know whether the phone is on Wi-Fi or mobile data, and continue when Wi-Fi comes back.
+  void Network.getStatus()
+    .then((st) => {
+      connection = st.connected ? (st.connectionType as typeof connection) : "none";
+      sync();
+    })
+    .catch(() => {});
+  void Network.addListener("networkStatusChange", (st) => {
+    connection = st.connected ? (st.connectionType as typeof connection) : "none";
+    sync();
+  }).catch(() => {});
 }
