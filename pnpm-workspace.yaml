@@ -3,6 +3,7 @@ packages:
   - web
   - desktop
   - mobile
+  - phone
 
 onlyBuiltDependencies:
   - esbuild

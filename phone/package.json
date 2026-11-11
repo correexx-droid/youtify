@@ -1,0 +1,67 @@
+{
+  "name": "youtify-mobile",
+  "productName": "YoutiFy Mobile",
+  "version": "1.5.1",
+  "description": "The YoutiFy phone app as a PC program.",
+  "author": "YoutiFy",
+  "main": "dist/main.cjs",
+  "scripts": {
+    "bundle": "node scripts/bundle.mjs",
+    "start": "node scripts/bundle.mjs && electron .",
+    "dist": "pnpm --filter @musike/web build:native && node scripts/bundle.mjs && electron-builder --win nsis --publish never",
+    "dist:linux": "pnpm --filter @musike/web build:native && node scripts/bundle.mjs && electron-builder --linux AppImage deb --publish never",
+    "typecheck": "tsc --noEmit"
+  },
+  "build": {
+    "appId": "app.youtify.mobile",
+    "productName": "YoutiFy Mobile",
+    "copyright": "YoutiFy",
+    "directories": {
+      "output": "out",
+      "buildResources": "build"
+    },
+    "files": [
+      "dist/**",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../web/dist-native",
+        "to": "www"
+      }
+    ],
+    "asar": true,
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.ico",
+      "artifactName": "YoutiFy-Mobile-Setup-${version}-Windows.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "shortcutName": "YoutiFy Mobile",
+      "createDesktopShortcut": true
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "icon": "build/icon.png",
+      "category": "Audio",
+      "executableName": "youtify-mobile",
+      "artifactName": "YoutiFy-Mobile-Setup-${version}-Linux-x64.${ext}",
+      "maintainer": "YoutiFy <noreply@youtify.app>"
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "electron": "44.7.0",
+    "electron-builder": "26.15.3",
+    "esbuild": "0.28.2",
+    "typescript": "^7.0.2"
+  },
+  "homepage": "https://github.com/correexx-droid/youtify",
+  "private": true
+}

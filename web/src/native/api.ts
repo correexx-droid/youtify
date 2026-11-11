@@ -1,4 +1,4 @@
-import { CapacitorHttp } from "@capacitor/core";
+import { Capacitor, CapacitorHttp } from "@capacitor/core";
 import { Directory, Encoding, Filesystem } from "@capacitor/filesystem";
 import { Share } from "@capacitor/share";
 import {
@@ -120,6 +120,17 @@ export const api: MusikeApi = {
 /** On the phone, the media element plays YouTube's stream directly: resolved here, no proxy needed. */
 export const streamSource = (id: string): Promise<string> => resolveAudio(id).then((r) => r.url);
 
+/** Set by YoutiFy Mobile's preload on a PC. */
+const pcBytes = (
+  globalThis as {
+    __musikeFetchBytes?: (req: { url: string; headers: Record<string, string> }) => Promise<{
+      status: number;
+      headers: Record<string, string>;
+      bytes: Uint8Array;
+    }>;
+  }
+).__musikeFetchBytes;
+
 function base64Bytes(b64: string): Uint8Array {
   const bin = atob(b64);
   const out = new Uint8Array(bin.length);
@@ -138,13 +149,15 @@ export async function downloadAudio(id: string, onProgress?: (done: number, tota
   let resolved = await resolveAudio(id);
   let refreshed = false;
   return downloadInChunks(async (start, end) => {
-    const get = () =>
-      CapacitorHttp.request({
-        url: resolved.url,
-        method: "GET",
-        headers: { Range: `bytes=${start}-${end}`, "User-Agent": navigator.userAgent },
-        responseType: "arraybuffer",
-      });
+    const headers = { Range: `bytes=${start}-${end}`, "User-Agent": navigator.userAgent };
+    const get = async (): Promise<{ status: number; headers?: Record<string, string>; data: unknown }> => {
+      // YoutiFy Mobile on a PC: its main process fetches the bytes (see phone/src/main.ts).
+      if (pcBytes) {
+        const r = await pcBytes({ url: resolved.url, headers });
+        return { status: r.status, headers: r.headers, data: r.bytes.buffer.slice(r.bytes.byteOffset, r.bytes.byteOffset + r.bytes.byteLength) };
+      }
+      return CapacitorHttp.request({ url: resolved.url, method: "GET", headers, responseType: "arraybuffer" });
+    };
     let res = await get();
     // An expired or refused URL: resolve a fresh one once and carry on where we were.
     if ((res.status === 403 || res.status === 410) && !refreshed) {
@@ -170,6 +183,14 @@ export async function explainStreamError(url: string): Promise<{ message: string
 
 /** Backups are shared through Android's share sheet (save to Files, Drive, send to the computer…). */
 export async function saveFile(name: string, text: string) {
+  if (!Capacitor.isNativePlatform()) {
+    // YoutiFy Mobile on a PC: a normal download.
+    const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
+    const a = Object.assign(document.createElement("a"), { href: url, download: name });
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    return;
+  }
   const { uri } = await Filesystem.writeFile({ path: name, data: text, directory: Directory.Cache, encoding: Encoding.UTF8 });
   await Share.share({ title: name, files: [uri] });
 }
