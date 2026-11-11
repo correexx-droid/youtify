@@ -180,6 +180,20 @@ export const de: Messages = {
     showLyrics: "Songtext anzeigen",
   },
 
+  spotify: {
+    title: "Spotify-Zugang (für lange Playlists)",
+    body: "Ohne Zugang zeigt Spotify nur die ersten 100 Songs einer Playlist. Mit deinem eigenen, kostenlosen Spotify-Zugang liest YoutiFy ganze Playlists über Spotifys offizielle Schnittstelle.",
+    steps: [
+      "Auf developer.spotify.com/dashboard mit deinem Spotify-Konto anmelden und auf „Create app“ klicken.",
+      "Name und Beschreibung beliebig; Redirect URI: http://127.0.0.1:8888/callback; „Web API“ anhaken; speichern.",
+      "In den Settings der App Client ID und Client Secret kopieren und unten eintragen.",
+    ],
+    save: "Speichern",
+    saved: "Spotify-Zugang gespeichert",
+    removed: "Spotify-Zugang entfernt",
+    active: "Aktiv: Ganze Playlists werden kopiert",
+  },
+
   importFiles: {
     button: "Musik importieren",
     title: "Eigene Musik importieren",
@@ -212,6 +226,11 @@ export const de: Messages = {
     open: "Playlist öffnen",
     failed: "Diese Playlist konnte nicht kopiert werden.",
     fieldPlaceholder: "Spotify- oder YouTube-Link einfügen",
+    updated: (name, n) => `„${name}" wurde schon einmal kopiert und ist jetzt aktuell (${n} Songs geprüft, neue hinzugefügt).`,
+    partialTitle: "Spotify hat nur die ersten 100 Songs gezeigt",
+    partialBody:
+      "Ohne Spotify-Anmeldung gibt Spotify nur die ersten 100 Songs einer Playlist heraus. Für alle Songs: Trag deinen kostenlosen Spotify-Zugang in den Einstellungen ein, oder markiere in der Spotify-App alle Songs (Strg+A), kopiere sie (Strg+C) und füge sie ins Feld ein.",
+    partialSetup: "Spotify-Zugang einrichten",
     showProgress: "Fortschritt anzeigen",
     cardTitle: "Diese Playlist kopieren",
     cardBody: (source) => `Erstellt eine neue YoutiFy-Playlist mit den Songs von ${source}.`,

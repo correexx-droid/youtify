@@ -15,6 +15,7 @@ import { useSystem } from "../stores/system";
 import { useUi } from "../stores/ui";
 import { BackupSection } from "./BackupSection";
 import { OfflineSection } from "./Offline";
+import { SpotifySection } from "./SpotifySection";
 import { AccentPicker, LayoutSection } from "./CustomizeSection";
 import { Modal } from "./Modal";
 
@@ -156,6 +157,8 @@ export function SettingsDialog() {
         <LayoutSection />
 
         <OfflineSection />
+
+        <SpotifySection />
 
         <BackupSection />
 

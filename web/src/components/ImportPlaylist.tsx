@@ -8,6 +8,7 @@ import { cn } from "../lib/format";
 import { paths } from "../lib/routes";
 import type { Track } from "../lib/types";
 import { useLibrary } from "../stores/library";
+import { useUi } from "../stores/ui";
 import { Modal } from "./Modal";
 
 /**
@@ -18,9 +19,45 @@ import { Modal } from "./Modal";
 
 const CONCURRENCY = 3;
 
-/** A Spotify playlist/album/track link, or a YouTube link with a playlist in it (list=…). */
+const SPOTIFY_TRACK = /(?:open\.spotify\.com\/(?:intl-[\w-]+\/)?track\/|spotify:track:)([A-Za-z0-9]{22})/g;
+
+/** Song links copied out of the Spotify app (select songs, Ctrl+C): one link per song. */
+const songLinkCount = (text: string) => new Set([...text.matchAll(SPOTIFY_TRACK)].map((m) => m[1])).size;
+
+/** Which playlist a link was copied into before, so copying it again updates that one instead of adding another. */
+const LINKS_KEY = "youtify:imported-links";
+
+function linkKey(url: string): string | null {
+  const sp = /(playlist|album|track)[/:]([A-Za-z0-9]{10,40})/.exec(url);
+  if (/spotify/.test(url) && sp && songLinkCount(url) < 2) return `spotify:${sp[1]}:${sp[2]}`;
+  try {
+    const list = new URL(url.trim()).searchParams.get("list");
+    return list ? `youtube:${list}` : null;
+  } catch {
+    return null;
+  }
+}
+
+function readLinks(): Record<string, string> {
+  try {
+    return JSON.parse(localStorage.getItem(LINKS_KEY) ?? "{}") ?? {};
+  } catch {
+    return {};
+  }
+}
+
+function rememberLink(key: string, playlistId: string) {
+  try {
+    localStorage.setItem(LINKS_KEY, JSON.stringify({ ...readLinks(), [key]: playlistId }));
+  } catch {
+    /* private mode */
+  }
+}
+
+/** A Spotify playlist/album/track link, Spotify song links, or a YouTube link with a playlist in it (list=…). */
 export function isPlaylistLink(text: string): boolean {
   const s = text.trim();
+  if (songLinkCount(s) >= 2) return true;
   if (/(open\.spotify\.com\/(intl-[\w-]+\/)?(embed\/)?|spotify:)(playlist|album|track)[/:][A-Za-z0-9]{10,}/.test(s)) return true;
   try {
     const url = new URL(s);
@@ -43,7 +80,18 @@ type Phase =
   | { step: "idle" }
   | { step: "reading" }
   | { step: "matching"; source: "spotify"; name: string; done: number; total: number }
-  | { step: "done"; playlistId: string; name: string; found: number; total: number; missing: string[] }
+  | {
+      step: "done";
+      playlistId: string;
+      name: string;
+      found: number;
+      total: number;
+      missing: string[];
+      /** The copy already existed: new songs were added to it. */
+      updated: boolean;
+      /** Spotify only showed the first 100 songs (no Spotify keys in Settings). */
+      partial: boolean;
+    }
   | { step: "error"; message: string };
 
 interface ImportState {
@@ -119,7 +167,9 @@ export const useImport = create<ImportState>((set, get) => ({
   setUrl: (url) => set({ url }),
   start: async () => {
     const url = get().url.trim();
-    if (!url) return;
+    const step = get().phase.step;
+    // One copy at a time: a second click or Enter while one runs would create the playlist twice.
+    if (!url || step === "reading" || step === "matching") return;
     set({ phase: { step: "reading" } });
     try {
       const link = await api.readPlaylistLink(url);
@@ -146,9 +196,28 @@ export const useImport = create<ImportState>((set, get) => ({
         });
       }
       if (!tracks.length) throw new Error("empty");
-      const playlist = await useLibrary.getState().createPlaylist(link.name, tracks);
+      const lib = useLibrary.getState();
+      // Copied this link before? Bring that playlist up to date instead of making a second one.
+      const key = linkKey(url);
+      const known = key ? readLinks()[key] : undefined;
+      const existing = known ? lib.playlists.find((p) => p.id === known) : undefined;
+      let playlist = existing;
+      if (existing) await lib.addToPlaylist(existing.id, tracks);
+      else playlist = (await lib.createPlaylist(link.name, tracks)) ?? undefined;
       if (!playlist) throw new Error("create");
-      set({ phase: { step: "done", playlistId: playlist.id, name: playlist.name, found: tracks.length, total, missing } });
+      if (key) rememberLink(key, playlist.id);
+      set({
+        phase: {
+          step: "done",
+          playlistId: playlist.id,
+          name: playlist.name,
+          found: tracks.length,
+          total,
+          missing,
+          updated: !!existing,
+          partial: link.source === "spotify" && !!link.partial,
+        },
+      });
     } catch (e) {
       set({ phase: { step: "error", message: (e as Error).message } });
     }
@@ -337,8 +406,25 @@ export function ImportPlaylistDialog() {
         {phase.step === "done" && (
           <div className="flex flex-col gap-3">
             <p className="flex items-center gap-2 text-sm font-medium">
-              <CheckCircleIcon size={20} weight="fill" className="text-accent-text" /> {t.importLink.done(phase.name, phase.found, phase.total)}
+              <CheckCircleIcon size={20} weight="fill" className="text-accent-text" />{" "}
+              {phase.updated ? t.importLink.updated(phase.name, phase.found) : t.importLink.done(phase.name, phase.found, phase.total)}
             </p>
+            {phase.partial && (
+              <div className="flex flex-col gap-2 rounded-[14px] bg-accent-soft p-3 text-sm ring-1 ring-accent/30">
+                <p className="font-semibold text-accent-text">{t.importLink.partialTitle}</p>
+                <p className="text-fg-2">{t.importLink.partialBody}</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpen(false);
+                    useUi.getState().setSettingsOpen(true);
+                  }}
+                  className="self-start rounded-full bg-accent px-4 py-2 text-xs font-semibold text-accent-ink"
+                >
+                  {t.importLink.partialSetup}
+                </button>
+              </div>
+            )}
             {phase.missing.length > 0 && (
               <details className="rounded-[14px] bg-surface-1 p-3 text-sm ring-1 ring-line">
                 <summary className="cursor-pointer text-fg-2">{t.importLink.missing(phase.missing.length)}</summary>

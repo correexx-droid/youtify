@@ -19,9 +19,21 @@ export interface LinkQuery {
 
 export type LinkImport =
   | { source: "youtube"; name: string; tracks: Track[] }
-  | { source: "spotify"; name: string; queries: LinkQuery[] };
+  | {
+      source: "spotify";
+      name: string;
+      queries: LinkQuery[];
+      /** True when only Spotify's public preview was read and the playlist may hold more than these songs. */
+      partial?: boolean;
+    };
 
-const MAX_TRACKS = 500;
+/** The user's own Spotify app (developer.spotify.com): lets the official Web API read whole playlists. */
+export interface SpotifyCredentials {
+  clientId: string;
+  clientSecret: string;
+}
+
+const MAX_TRACKS = 5000;
 const YT_LIST = /^[\w-]{10,64}$/;
 const SPOTIFY = /(?:open\.spotify\.com\/(?:intl-[\w-]+\/)?(?:embed\/)?|spotify:)(playlist|album|track)[/:]([A-Za-z0-9]{10,40})/;
 
@@ -72,7 +84,7 @@ async function youtubePlaylist(id: string, lang: Lang): Promise<LinkImport> {
     const name = text(page?.info?.title) || "YouTube playlist";
     const seen = new Set<string>();
     const tracks: Track[] = [];
-    for (let round = 0; round < 30; round++) {
+    for (let round = 0; round < 250; round++) {
       for (const item of page?.items ?? page?.videos ?? []) {
         const track = lockupTrack(item) ?? toTrack(item, "song");
         if (track && !seen.has(track.id)) {
@@ -87,13 +99,80 @@ async function youtubePlaylist(id: string, lang: Lang): Promise<LinkImport> {
   }, lang);
 }
 
-async function spotify(type: string, id: string): Promise<LinkImport> {
-  const doFetch = config.fetch ?? fetch;
-  const res = await doFetch(`https://open.spotify.com/embed/${type}/${id}`, {
+const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36";
+const doFetch: typeof fetch = (input, init) => (config.fetch ?? fetch)(input, init);
+
+// ---------------------------------------------------------------- Official Web API (with the user's own app keys)
+
+const tokens = new Map<string, { token: string; until: number }>();
+
+async function spotifyToken(c: SpotifyCredentials): Promise<string> {
+  const key = c.clientId;
+  const cached = tokens.get(key);
+  if (cached && cached.until > Date.now() + 30_000) return cached.token;
+  const res = await doFetch("https://accounts.spotify.com/api/token", {
+    method: "POST",
     headers: {
-      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36",
-      "Accept-Language": "en",
+      "Content-Type": "application/x-www-form-urlencoded",
+      Authorization: `Basic ${btoa(`${c.clientId}:${c.clientSecret}`)}`,
     },
+    body: "grant_type=client_credentials",
+  });
+  if (!res.ok) throw new HttpError(401, msg("spotifyKeys"));
+  const body = (await res.json()) as { access_token: string; expires_in: number };
+  tokens.set(key, { token: body.access_token, until: Date.now() + body.expires_in * 1000 });
+  return body.access_token;
+}
+
+async function spotifyApi(type: string, id: string, c: SpotifyCredentials): Promise<LinkImport> {
+  const token = await spotifyToken(c);
+  const get = async (url: string) => {
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const res = await doFetch(url, { headers: { Authorization: `Bearer ${token}` } });
+      if (res.status === 429) {
+        await new Promise((r) => setTimeout(r, (Number(res.headers.get("retry-after")) || 2) * 1000));
+        continue;
+      }
+      if (!res.ok) throw new HttpError(res.status === 404 ? 404 : 502, msg("importFailed"));
+      return (await res.json()) as any;
+    }
+    throw new HttpError(502, msg("importFailed"));
+  };
+  const toQuery = (t: any): LinkQuery | null =>
+    t?.name
+      ? {
+          title: String(t.name),
+          artist: (t.artists ?? []).map((a: any) => a?.name).filter(Boolean).join(", "),
+          duration: Math.round((Number(t.duration_ms) || 0) / 1000),
+        }
+      : null;
+  const api = "https://api.spotify.com/v1";
+  if (type === "track") {
+    const t = await get(`${api}/tracks/${id}`);
+    return { source: "spotify", name: text(t.name) || "Spotify", queries: [toQuery(t)!].filter(Boolean) };
+  }
+  const head = await get(`${api}/${type === "album" ? "albums" : "playlists"}/${id}?fields=name`);
+  const queries: LinkQuery[] = [];
+  let next: string | null =
+    type === "album"
+      ? `${api}/albums/${id}/tracks?limit=50`
+      : `${api}/playlists/${id}/tracks?limit=100&fields=next,items(track(name,duration_ms,artists(name)))`;
+  while (next && queries.length < MAX_TRACKS) {
+    const page = await get(next);
+    for (const item of page.items ?? []) {
+      const q = toQuery(type === "album" ? item : item?.track);
+      if (q) queries.push(q);
+    }
+    next = page.next ?? null;
+  }
+  return { source: "spotify", name: text(head.name) || "Spotify", queries };
+}
+
+// ---------------------------------------------------------------- Public embed page (no account)
+
+async function spotify(type: string, id: string): Promise<LinkImport> {
+  const res = await doFetch(`https://open.spotify.com/embed/${type}/${id}`, {
+    headers: { "User-Agent": UA, "Accept-Language": "en" },
   });
   if (!res.ok) throw new HttpError(res.status === 404 ? 404 : 502, msg("importFailed"));
   const html = await res.text();
@@ -112,15 +191,46 @@ async function spotify(type: string, id: string): Promise<LinkImport> {
     }))
     .filter((q) => q.title)
     .slice(0, MAX_TRACKS);
-  return { source: "spotify", name, queries };
+  // The public page lists at most 100 songs of a playlist.
+  return { source: "spotify", name, queries, partial: type === "playlist" && list.length >= 100 };
 }
 
-export async function readPlaylistLink(url: string, lang: Lang): Promise<LinkImport> {
-  const link = parseLink(url);
-  if (!link) throw new HttpError(400, msg("importBadLink"));
+/** Song links copied out of the Spotify app (select all songs, copy): every link is read on its own. */
+const SPOTIFY_TRACKS = /(?:open\.spotify\.com\/(?:intl-[\w-]+\/)?track\/|spotify:track:)([A-Za-z0-9]{22})/g;
+
+export function trackLinks(text: string): string[] {
+  return [...new Set([...text.matchAll(SPOTIFY_TRACKS)].map((m) => m[1]!))].slice(0, MAX_TRACKS);
+}
+
+async function spotifyTrackList(ids: string[], c: SpotifyCredentials | null): Promise<LinkImport> {
+  const queries: (LinkQuery | null)[] = new Array(ids.length).fill(null);
+  let next = 0;
+  const worker = async () => {
+    while (next < ids.length) {
+      const i = next++;
+      try {
+        const r = c ? await spotifyApi("track", ids[i]!, c) : await spotify("track", ids[i]!);
+        queries[i] = r.source === "spotify" ? (r.queries[0] ?? null) : null;
+      } catch {
+        queries[i] = null;
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(6, ids.length) }, worker));
+  return { source: "spotify", name: "Spotify-Import", queries: queries.filter((q): q is LinkQuery => !!q) };
+}
+
+export async function readPlaylistLink(url: string, lang: Lang, keys?: SpotifyCredentials | null): Promise<LinkImport> {
+  const creds = keys?.clientId && keys.clientSecret ? keys : null;
+  const songs = trackLinks(url);
+  const link = songs.length > 1 ? null : parseLink(url);
+  if (!link && songs.length < 2) throw new HttpError(400, msg("importBadLink"));
   let result: LinkImport;
   try {
-    result = link.kind === "youtube" ? await youtubePlaylist(link.id, lang) : await spotify(link.type, link.id);
+    if (!link) result = await spotifyTrackList(songs, creds);
+    else if (link.kind === "youtube") result = await youtubePlaylist(link.id, lang);
+    else if (creds) result = await spotifyApi(link.type, link.id, creds);
+    else result = await spotify(link.type, link.id);
   } catch (e) {
     if (e instanceof HttpError) throw e;
     throw new HttpError(502, msg("importFailed"));

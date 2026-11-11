@@ -118,9 +118,13 @@ export async function startServer(opts: StartOptions = {}): Promise<RunningServe
   });
 
   /** A Spotify or YouTube playlist link, read so it can be copied into a new playlist. */
-  app.get("/api/import-link", async (req) => {
-    const { url } = req.query as { url?: string };
-    return readPlaylistLink((url ?? "").slice(0, 500), langOf(req));
+  app.post("/api/import-link", async (req) => {
+    const { url } = (req.body ?? {}) as { url?: string };
+    const header = (name: string) => String(req.headers[name] ?? "").slice(0, 200);
+    return readPlaylistLink((url ?? "").slice(0, 200_000), langOf(req), {
+      clientId: header("x-spotify-client-id"),
+      clientSecret: header("x-spotify-client-secret"),
+    });
   });
 
   /** The music video for a song, so "Vídeo" mode can show the clip instead of a still cover. */

@@ -1,7 +1,7 @@
 export type LinkQuery = { title: string; artist: string; duration: number };
 export type LinkImport =
   | { source: "youtube"; name: string; tracks: import("./types").Track[] }
-  | { source: "spotify"; name: string; queries: LinkQuery[] };
+  | { source: "spotify"; name: string; queries: LinkQuery[]; partial?: boolean };
 
 import type { AlbumCard, AlbumPage, ArtistPage, Genre, GenreArtist, GenrePage, Library, Playlist, Track } from "./types";
 

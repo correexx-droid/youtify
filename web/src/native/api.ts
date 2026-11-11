@@ -20,6 +20,7 @@ import { HttpError, VIDEO_ID } from "../../../server/src/types";
 import { getLang, getT } from "../i18n";
 import { ApiError, type MusikeApi, type SystemInfo } from "../lib/apiTypes";
 import { downloadInChunks, totalFromContentRange } from "../lib/chunked";
+import { getSpotifyKeys } from "../lib/spotifyKeys";
 import "./android";
 import { media } from "./media";
 import { nativeStorage } from "./storage";
@@ -83,7 +84,7 @@ export const api: MusikeApi = {
       if (!ALBUM_ID.test(id)) throw fail(400, "invalidAlbum");
       return albumPage(id, getLang());
     }, signal),
-  readPlaylistLink: (url) => call(() => readPlaylistLink(url.slice(0, 500), getLang())),
+  readPlaylistLink: (url) => call(() => readPlaylistLink(url.slice(0, 200_000), getLang(), getSpotifyKeys())),
   searchAlbums: (q, signal) => call(() => searchAlbums(q.trim().slice(0, 200), getLang()), signal),
   videoFor: (t) => call(() => findVideoFor(t.id, t.title, t.artist, t.duration)),
   prepare: (id, signal) =>

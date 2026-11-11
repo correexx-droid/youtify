@@ -186,6 +186,20 @@ export const en = {
     showLyrics: "Show lyrics",
   },
 
+  spotify: {
+    title: "Spotify access (for long playlists)",
+    body: "Without it, Spotify shows only the first 100 songs of a playlist. With your own free Spotify app keys, YoutiFy reads whole playlists through Spotify's official interface.",
+    steps: [
+      "Sign in on developer.spotify.com/dashboard with your Spotify account and click \"Create app\".",
+      "Any name and description; Redirect URI: http://127.0.0.1:8888/callback; tick \"Web API\"; save.",
+      "Open the app's Settings, copy Client ID and Client Secret into the fields below.",
+    ],
+    save: "Save",
+    saved: "Spotify access saved",
+    removed: "Spotify access removed",
+    active: "Active: whole playlists are copied",
+  },
+
   importFiles: {
     button: "Import music",
     title: "Import your own music",
@@ -218,6 +232,11 @@ export const en = {
     open: "Open playlist",
     failed: "Couldn't copy this playlist.",
     fieldPlaceholder: "Paste a Spotify or YouTube link",
+    updated: (name: string, n: number) => `"${name}" was copied before: it's up to date now (${n} songs checked, new ones added).`,
+    partialTitle: "Spotify only showed the first 100 songs",
+    partialBody:
+      "Without a Spotify login, Spotify only shares the first 100 songs of a playlist. To copy all of them, add your free Spotify keys in Settings, or select all songs in the Spotify app (Ctrl+A), copy them (Ctrl+C) and paste them into the field.",
+    partialSetup: "Set up Spotify access",
     showProgress: "Show progress",
     cardTitle: "Copy this playlist",
     cardBody: (source: string) => `Creates a new YoutiFy playlist with the songs from ${source}.`,

@@ -12,6 +12,7 @@ import {
   type SystemMedia,
 } from "./apiTypes";
 import { downloadInChunks, totalFromContentRange } from "./chunked";
+import { getSpotifyKeys } from "./spotifyKeys";
 import type { AlbumCard, AlbumPage, ArtistPage, Genre, GenreArtist, GenrePage, Library, Playlist, Track } from "./types";
 
 // The HTTP backend: the Musike server (web app, desktop app). The Android build swaps this module for native/api.ts.
@@ -49,7 +50,14 @@ export const api: MusikeApi = {
     request<{ artists: GenreArtist[]; hasMore: boolean }>(`/api/genres/${encodeURIComponent(id)}/artists?offset=${offset}`),
   artist: (id: string, signal?: AbortSignal) => request<ArtistPage>(`/api/artists/${encodeURIComponent(id)}`, { signal }),
   album: (id: string, signal?: AbortSignal) => request<AlbumPage>(`/api/albums/${encodeURIComponent(id)}`, { signal }),
-  readPlaylistLink: (url: string) => request<LinkImport>(`/api/import-link?url=${encodeURIComponent(url)}`),
+  readPlaylistLink: (url: string) => {
+    const keys = getSpotifyKeys();
+    return request<LinkImport>("/api/import-link", {
+      method: "POST",
+      json: { url },
+      headers: keys ? { "x-spotify-client-id": keys.clientId, "x-spotify-client-secret": keys.clientSecret } : {},
+    });
+  },
   searchAlbums: (q: string, signal?: AbortSignal) =>
     request<{ albums: AlbumCard[] }>(`/api/search/albums?q=${encodeURIComponent(q)}`, { signal }).then((r) => r.albums),
   /** The music video matching a song, or null when YouTube has none. */

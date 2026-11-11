@@ -56,6 +56,7 @@ const en = {
   importBadLink: "That isn't a Spotify or YouTube playlist link.",
   importFailed: "Couldn't read this playlist. Is it public?",
   importEmpty: "No tracks found in this playlist.",
+  spotifyKeys: "Spotify didn't accept the Client ID and secret from Settings. Check them on developer.spotify.com.",
 };
 
 export type MsgKey = keyof typeof en;
@@ -110,6 +111,7 @@ const de: Record<MsgKey, string> = {
   importBadLink: "Das ist kein Spotify- oder YouTube-Playlist-Link.",
   importFailed: "Die Playlist konnte nicht gelesen werden. Ist sie öffentlich?",
   importEmpty: "In dieser Playlist wurden keine Titel gefunden.",
+  spotifyKeys: "Spotify hat Client-ID und Secret aus den Einstellungen nicht akzeptiert. Prüfe sie auf developer.spotify.com.",
 };
 
 const CATALOG: Record<Lang, Record<MsgKey, string>> = { en, de };
