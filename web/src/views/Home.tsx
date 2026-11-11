@@ -1,3 +1,4 @@
+import { PlaylistLinkField } from "../components/ImportPlaylist";
 import { ClockCounterClockwiseIcon, HeartIcon, MagnifyingGlassIcon, PlayIcon } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
 import { Link, useNavigate } from "react-router";
@@ -66,6 +67,7 @@ export default function Home() {
       <div className="px-4 pt-2 pb-6 md:px-6 md:pt-8">
         <p className="mb-1 text-xs font-semibold tracking-[0.2em] text-accent-text uppercase">YoutiFy</p>
         <h1 className="text-gradient text-[30px] leading-tight font-bold tracking-tight md:text-5xl">{t.time.greeting(new Date().getHours())}</h1>
+        <PlaylistLinkField className="mt-5 max-w-2xl" />
       </div>
 
       {status === "loading" && <TrackListSkeleton rows={6} />}

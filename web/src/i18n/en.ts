@@ -217,6 +217,10 @@ export const en = {
     missing: (n: number) => `${n} ${n === 1 ? "song" : "songs"} not found`,
     open: "Open playlist",
     failed: "Couldn't copy this playlist.",
+    fieldPlaceholder: "Paste a Spotify or YouTube link",
+    showProgress: "Show progress",
+    cardTitle: "Copy this playlist",
+    cardBody: (source: string) => `Creates a new YoutiFy playlist with the songs from ${source}.`,
   },
 
   offline: {

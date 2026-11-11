@@ -211,6 +211,10 @@ export const de: Messages = {
     missing: (n) => `${n} ${n === 1 ? "Song" : "Songs"} nicht gefunden`,
     open: "Playlist öffnen",
     failed: "Diese Playlist konnte nicht kopiert werden.",
+    fieldPlaceholder: "Spotify- oder YouTube-Link einfügen",
+    showProgress: "Fortschritt anzeigen",
+    cardTitle: "Diese Playlist kopieren",
+    cardBody: (source) => `Erstellt eine neue YoutiFy-Playlist mit den Songs von ${source}.`,
   },
 
   offline: {

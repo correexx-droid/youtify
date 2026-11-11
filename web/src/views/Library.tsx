@@ -4,7 +4,7 @@ import { Link, useNavigate } from "react-router";
 import { Cover, type CoverKind } from "../components/Cover";
 import { NamePlaylistDialog } from "../components/Dialogs";
 import { ImportFilesButton } from "../components/ImportFiles";
-import { ImportPlaylistButton } from "../components/ImportPlaylist";
+import { ImportPlaylistButton, PlaylistLinkField } from "../components/ImportPlaylist";
 import { PageHeader } from "../components/Page";
 import { useT } from "../i18n";
 import { paths } from "../lib/routes";
@@ -64,6 +64,8 @@ export default function Library() {
           </>
         }
       />
+
+      <PlaylistLinkField className="px-4 pt-3 pb-2 md:max-w-2xl md:px-6" />
 
       <ul className="grid grid-cols-1 gap-1 px-2 pt-2 md:grid-cols-3 md:gap-2 md:px-4 lg:grid-cols-4 2xl:grid-cols-6">
         <Entry to={paths.favorites} name={t.nav.favorites} kind="favorites" tracks={favorites} sub={t.common.tracks(favorites.length)} />

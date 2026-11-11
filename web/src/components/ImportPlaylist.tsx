@@ -1,4 +1,4 @@
-import { CheckCircleIcon, CopyIcon, LinkIcon, SpotifyLogoIcon, WarningCircleIcon, YoutubeLogoIcon } from "@phosphor-icons/react";
+import { ArrowRightIcon, CheckCircleIcon, CopyIcon, LinkIcon, SpotifyLogoIcon, WarningCircleIcon, YoutubeLogoIcon } from "@phosphor-icons/react";
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { create } from "zustand";
@@ -17,6 +17,27 @@ import { Modal } from "./Modal";
  */
 
 const CONCURRENCY = 3;
+
+/** A Spotify playlist/album/track link, or a YouTube link with a playlist in it (list=…). */
+export function isPlaylistLink(text: string): boolean {
+  const s = text.trim();
+  if (/(open\.spotify\.com\/(intl-[\w-]+\/)?(embed\/)?|spotify:)(playlist|album|track)[/:][A-Za-z0-9]{10,}/.test(s)) return true;
+  try {
+    const url = new URL(s);
+    return /(^|\.)youtube\.com$|(^|\.)youtu\.be$/.test(url.hostname) && /^[\w-]{10,64}$/.test(url.searchParams.get("list") ?? "");
+  } catch {
+    return false;
+  }
+}
+
+/** Starts copying a link and shows the progress window. */
+export function copyPlaylistLink(url: string) {
+  const s = useImport.getState();
+  if (s.phase.step === "reading" || s.phase.step === "matching") return s.setOpen(true);
+  useImport.setState({ url: url.trim(), phase: { step: "idle" } });
+  useImport.setState({ open: true });
+  void s.start();
+}
 
 type Phase =
   | { step: "idle" }
@@ -133,6 +154,97 @@ export const useImport = create<ImportState>((set, get) => ({
     }
   },
 }));
+
+/**
+ * Always-visible text field: paste a Spotify or YouTube playlist link, press Enter or the arrow, and the songs are
+ * copied into a new playlist (progress opens in the "Copy a playlist" window).
+ */
+export function PlaylistLinkField({ className }: { className?: string }) {
+  const t = useT();
+  const [value, setValue] = useState("");
+  const [wrong, setWrong] = useState(false);
+  const busy = useImport((s) => s.phase.step === "reading" || s.phase.step === "matching");
+  const submit = () => {
+    if (!value.trim()) return;
+    if (!isPlaylistLink(value)) return setWrong(true);
+    copyPlaylistLink(value);
+    setValue("");
+  };
+  return (
+    <form
+      className={cn("flex flex-col gap-1.5", className)}
+      onSubmit={(e) => {
+        e.preventDefault();
+        submit();
+      }}
+    >
+      <label className="flex h-12 items-center gap-2 rounded-full bg-surface-2/80 pr-1.5 pl-4 ring-1 ring-line backdrop-blur transition-shadow focus-within:ring-2 focus-within:ring-accent">
+        <CopyIcon size={18} weight="bold" className="shrink-0 text-accent-text" />
+        <input
+          value={value}
+          onChange={(e) => {
+            setValue(e.target.value);
+            setWrong(false);
+          }}
+          onPaste={(e) => {
+            // Pasting a valid link starts right away.
+            const pasted = e.clipboardData.getData("text");
+            if (isPlaylistLink(pasted) && !value.trim()) {
+              e.preventDefault();
+              copyPlaylistLink(pasted);
+            }
+          }}
+          placeholder={t.importLink.fieldPlaceholder}
+          aria-label={t.importLink.fieldPlaceholder}
+          inputMode="url"
+          enterKeyHint="go"
+          className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-fg-3"
+        />
+        <SpotifyLogoIcon size={18} weight="fill" className="hidden shrink-0 text-fg-3 sm:block" />
+        <YoutubeLogoIcon size={18} weight="fill" className="hidden shrink-0 text-fg-3 sm:block" />
+        <button
+          type="submit"
+          disabled={!value.trim()}
+          aria-label={t.importLink.copy}
+          title={t.importLink.copy}
+          className="grid size-9 shrink-0 place-items-center rounded-full bg-accent text-accent-ink transition-[opacity,transform] active:scale-95 disabled:opacity-40"
+        >
+          <ArrowRightIcon size={18} weight="bold" />
+        </button>
+      </label>
+      {wrong && <p className="px-4 text-xs text-danger">{t.importLink.notALink}</p>}
+      {busy && (
+        <button type="button" onClick={() => useImport.getState().setOpen(true)} className="px-4 text-left text-xs text-accent-text">
+          {t.importLink.working} {t.importLink.showProgress}
+        </button>
+      )}
+    </form>
+  );
+}
+
+/** Search: a pasted playlist link offers to copy it. */
+export function PlaylistLinkCard({ url }: { url: string }) {
+  const t = useT();
+  const spotify = /spotify/.test(url);
+  return (
+    <button
+      type="button"
+      onClick={() => copyPlaylistLink(url)}
+      className="flex w-full items-center gap-4 rounded-[16px] bg-linear-to-br from-accent/30 via-surface-2 to-surface-2 p-4 text-left ring-1 ring-line transition-[box-shadow] hover:ring-accent/50"
+    >
+      <span className="grid size-12 shrink-0 place-items-center rounded-[14px] bg-surface-3 text-accent-text">
+        {spotify ? <SpotifyLogoIcon size={26} weight="fill" /> : <YoutubeLogoIcon size={26} weight="fill" />}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block font-semibold">{t.importLink.cardTitle}</span>
+        <span className="block text-sm text-fg-2">{t.importLink.cardBody(spotify ? "Spotify" : "YouTube")}</span>
+      </span>
+      <span className="grid size-11 shrink-0 place-items-center rounded-full bg-accent text-accent-ink">
+        <CopyIcon size={20} weight="bold" />
+      </span>
+    </button>
+  );
+}
 
 export function ImportPlaylistButton({ className }: { className?: string }) {
   const t = useT();

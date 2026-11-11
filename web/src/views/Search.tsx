@@ -1,3 +1,4 @@
+import { isPlaylistLink, PlaylistLinkCard } from "../components/ImportPlaylist";
 import {
   ArrowRightIcon,
   ArrowUpLeftIcon,
@@ -102,7 +103,7 @@ export default function Search() {
 
   // Search as you type, debounced.
   useEffect(() => {
-    if (linkId || text.trim() === q) return;
+    if (linkId || isPlaylistLink(text) || text.trim() === q) return;
     const timer = setTimeout(() => setQuery(text), 380);
     return () => clearTimeout(timer);
   }, [text]);
@@ -137,7 +138,7 @@ export default function Search() {
 
   useEffect(() => {
     const term = text.trim();
-    if (!term || linkId) return setSuggestions([]);
+    if (!term || linkId || isPlaylistLink(text)) return setSuggestions([]);
     const ctrl = new AbortController();
     const timer = setTimeout(() => {
       api
@@ -310,6 +311,11 @@ export default function Search() {
       </div>
 
       <div className="mt-4 px-2 md:px-3">
+        {isPlaylistLink(text) && (
+          <div className="px-2 pb-3 md:px-3">
+            <PlaylistLinkCard url={text} />
+          </div>
+        )}
         {linkId && (
           <div className="px-2 md:px-3">
             {linkTrack === "loading" && <TrackListSkeleton rows={1} />}
