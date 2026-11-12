@@ -102,7 +102,7 @@ export async function compressTrack(
 ): Promise<CompressResult> {
   let duration: number | undefined;
   const raw = (): CompressResult => ({ file: encodeYtfy({ codec: "raw", mime, bytes }), codec: "raw", duration });
-  if (!canTranscode()) return raw();
+  if (!canTranscode() || bitrate <= 0) return raw();
   let pcm: AudioBuffer;
   try {
     pcm = await decode(bytes);

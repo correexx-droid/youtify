@@ -45,10 +45,14 @@ export interface ActiveJob {
   lastDataAt?: number;
   /** What's going on, in a few words ("waiting for YouTube", "retrying"…). */
   note?: string;
+  /** Which source is being tried (1 = the song's own video, 2–3 = other uploads of the same song). */
+  source?: number;
 }
 
-/** Downloads give up on one song after this and move on (it can be retried with the download button). */
-const SONG_TIMEOUT_MS = 4 * 60_000;
+/** One source (YouTube video) gets this long before the next one is tried. */
+const SONG_TIMEOUT_MS = 150_000;
+/** A song is tried from up to this many sources: its own video, then other uploads of the same song. */
+const MAX_SOURCES = 3;
 /** Compressing one song may take this long on a slow phone before the original is simply kept. */
 const COMPRESS_TIMEOUT_MS = 3 * 60_000;
 
@@ -68,10 +72,13 @@ function withTimeout<T>(job: Promise<T>, ms: number, message: string): Promise<T
   });
 }
 
+/** Compression levels for offline songs: Opus bitrate (0 = keep the download as it is). Savings vs. ~128 kbps. */
 export const QUALITIES = [
-  { id: "small", bitrate: 48_000 },
-  { id: "standard", bitrate: 64_000 },
-  { id: "high", bitrate: 96_000 },
+  { id: "off", bitrate: 0, saving: 0 },
+  { id: "high", bitrate: 96_000, saving: 25 },
+  { id: "standard", bitrate: 64_000, saving: 50 },
+  { id: "small", bitrate: 48_000, saving: 63 },
+  { id: "max", bitrate: 32_000, saving: 75 },
 ] as const;
 export type Quality = (typeof QUALITIES)[number]["id"];
 
@@ -156,6 +163,28 @@ function canDownloadNow(): boolean {
   return connection !== "cellular";
 }
 
+const currentBitrate = (): number => QUALITIES.find((q) => q.id === useOffline.getState().quality)?.bitrate ?? 64_000;
+
+/**
+ * Other uploads of the same song on YouTube (topic channel, lyric video, other channels), for when the song's own
+ * video won't download: similar length, not the same video.
+ */
+async function alternativeSources(track: Track): Promise<string[]> {
+  try {
+    const { lyricsQuery } = await import("../lib/lyrics");
+    const { api } = await import("../lib/api");
+    const q = lyricsQuery(track);
+    const found = await api.search([q.artist, q.title].filter(Boolean).join(" "), "song");
+    return found
+      .filter((t) => t.id !== track.id && t.kind !== "local")
+      .filter((t) => !track.duration || !t.duration || Math.abs(t.duration - track.duration) <= 20)
+      .map((t) => t.id)
+      .slice(0, MAX_SOURCES - 1);
+  } catch {
+    return [];
+  }
+}
+
 // ---------------------------------------------------------------- Store
 
 function readPins(): PinKey[] {
@@ -201,6 +230,8 @@ interface OfflineState {
   download: (key: PinKey, tracks: Track[]) => void;
   /** Delete button: removes the collection's downloads, keeping songs another downloaded collection still holds. */
   removeDownloads: (key: PinKey) => void;
+  /** Takes the songs that couldn't be downloaded out of the downloaded playlists (and Favorites). */
+  removeSkipped: () => Promise<number>;
   setWifiOnly: (on: boolean) => void;
   setQuality: (q: Quality) => void;
   retryFailed: () => void;
@@ -254,6 +285,27 @@ export const useOffline = create<OfflineState>((set, get) => ({
     set({ pins });
     // sync() deletes every song no remaining downloaded collection (or own import) needs.
     sync();
+  },
+  removeSkipped: async () => {
+    const failed = new Set(Object.keys(get().failed));
+    const lib = useLibrary.getState();
+    let removed = 0;
+    for (const key of get().pins) {
+      if (key === "favorites") {
+        for (const t of lib.favorites.filter((f) => failed.has(f.id))) {
+          await lib.toggleFavorite(t);
+          removed++;
+        }
+      } else {
+        const p = lib.playlists.find((pl) => `playlist:${pl.id}` === key);
+        for (const t of p?.tracks.filter((tr) => failed.has(tr.id)) ?? []) {
+          await lib.removeFromPlaylist(p!.id, t.id);
+          removed++;
+        }
+      }
+    }
+    set({ failed: {}, failedTitles: {} });
+    return removed;
   },
   setWifiOnly: (wifiOnly) => {
     try {
@@ -412,7 +464,8 @@ async function compressOne(item: OfflineItem) {
     if (!file) throw new Error("missing");
     const raw = decodeYtfy(file instanceof Uint8Array ? file : new Uint8Array(file as ArrayBuffer));
     if (raw.codec !== "raw") throw new Error("already compressed");
-    const bitrate = QUALITIES.find((q) => q.id === useOffline.getState().quality)!.bitrate;
+    const bitrate = currentBitrate();
+    if (!bitrate) throw new Error("compression off");
     const result = await withTimeout(
       compressTrack(raw.bytes, raw.mime, bitrate, (f) => useOffline.setState({ active: { ...job, progress: f } })),
       COMPRESS_TIMEOUT_MS,
@@ -449,14 +502,31 @@ async function saveOne(track: Track) {
   };
   update({});
   try {
-    const { bytes, mime } = await withTimeout(
-      downloadAudio(track.id, (done, total) =>
-        update({ received: done, total, progress: total ? Math.min(1, done / total) : 0, lastDataAt: Date.now(), note: undefined }),
-      ),
-      SONG_TIMEOUT_MS,
-      "timeout",
-    );
-    if (!bytes.length) throw new Error("empty download");
+    // The song's own video first; if that fails, up to two other uploads of the same song.
+    let result: { bytes: Uint8Array; mime: string } | null = null;
+    let lastError: Error = new Error("failed");
+    let sources: string[] = [track.id];
+    for (let n = 0; n < MAX_SOURCES && !result; n++) {
+      if (n === 1) sources = [track.id, ...(await alternativeSources(track))];
+      const source = sources[n];
+      if (!source) break;
+      update({ source: n + 1, received: 0, total: null, progress: 0, lastDataAt: Date.now(), note: n ? "alternative" : "resolving" });
+      try {
+        const got = await withTimeout(
+          downloadAudio(source, (done, total) =>
+            update({ received: done, total, progress: total ? Math.min(1, done / total) : 0, lastDataAt: Date.now(), note: undefined }),
+          ),
+          SONG_TIMEOUT_MS,
+          "timeout",
+        );
+        if (got.bytes.length) result = got;
+        else lastError = new Error("empty download");
+      } catch (e) {
+        lastError = e as Error;
+      }
+    }
+    if (!result) throw lastError;
+    const { bytes, mime } = result;
     // Still wanted after the download? (It may have been removed from the playlist meanwhile.)
     if (!wantedTracks().has(track.id)) return;
     // Stored as downloaded right away (playable offline now); the compression pass shrinks it afterwards.
@@ -470,7 +540,7 @@ async function saveOne(track: Track) {
       original: bytes.length,
       bitrate: 0,
       savedAt: Date.now(),
-      pendingCompress: canTranscode(),
+      pendingCompress: canTranscode() && currentBitrate() > 0,
     };
     await putSong(item, file);
     useOffline.setState((s) => ({ items: { ...s.items, [track.id]: item }, doneThisRun: s.doneThisRun + 1 }));
@@ -506,7 +576,7 @@ export interface ImportOutcome {
  */
 export async function importLocalFiles(files: File[], onProgress?: (p: ImportProgress) => void): Promise<ImportOutcome> {
   const { readTags, guessFromName, localId, coverThumb, mimeFor } = await import("../lib/localImport");
-  const bitrate = QUALITIES.find((q) => q.id === useOffline.getState().quality)!.bitrate;
+  const bitrate = currentBitrate();
   const out: ImportOutcome = { tracks: [], failed: [], stored: 0, original: 0 };
   for (const [index, file] of files.entries()) {
     const report = (phase: ImportProgress["phase"], progress: number) =>

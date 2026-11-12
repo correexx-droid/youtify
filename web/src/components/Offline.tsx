@@ -173,7 +173,7 @@ export function OfflineSection() {
 
       <div className="flex flex-col gap-1.5">
         <span className="text-xs text-fg-3">{t.offline.quality}</span>
-        <div role="radiogroup" aria-label={t.offline.quality} className="grid grid-cols-3 gap-1 rounded-full bg-surface-1 p-1 ring-1 ring-line">
+        <div role="radiogroup" aria-label={t.offline.quality} className="flex flex-col gap-1 rounded-[16px] bg-surface-1 p-1 ring-1 ring-line">
           {QUALITIES.map((q) => (
             <button
               key={q.id}
@@ -182,14 +182,18 @@ export function OfflineSection() {
               aria-checked={s.quality === q.id}
               onClick={() => s.setQuality(q.id as Quality)}
               className={cn(
-                "h-9 rounded-full px-2 text-[12px] font-semibold transition-colors",
-                s.quality === q.id ? "bg-accent text-accent-ink" : "text-fg-2 hover:text-fg",
+                "flex items-center justify-between gap-3 rounded-[12px] px-3 py-2 text-left text-sm transition-colors",
+                s.quality === q.id ? "bg-accent text-accent-ink" : "text-fg-2 hover:bg-surface-3 hover:text-fg",
               )}
             >
-              {t.offline.qualities[q.id]}
+              <span className="font-semibold">{t.offline.qualities[q.id]}</span>
+              <span className={cn("text-xs", s.quality === q.id ? "opacity-90" : "text-fg-3")}>
+                {q.bitrate ? t.offline.qualityHint(q.bitrate / 1000, q.saving) : t.offline.qualityOff}
+              </span>
             </button>
           ))}
         </div>
+        <p className="text-xs text-fg-3">{t.offline.qualityNote}</p>
       </div>
 
       <label className="flex cursor-pointer items-center justify-between gap-3 rounded-[16px] bg-surface-1 px-4 py-3 ring-1 ring-line">
@@ -231,12 +235,15 @@ export function OfflineSection() {
           <p className="mt-1 text-xs text-fg-3">{s.waitingForWifi ? t.offline.waitingWifiLong(s.queue) : t.offline.waitingOnline}</p>
         )}
         {s.failed > 0 && (
-          <p className="mt-2 flex items-center gap-2 text-xs text-danger">
-            <WarningCircleIcon size={15} /> {t.offline.failed(s.failed)}
-            <button type="button" onClick={s.retryFailed} className="font-semibold underline underline-offset-2">
-              {t.offline.retry}
-            </button>
-          </p>
+          <div className="mt-2 flex flex-col gap-2">
+            <p className="flex items-center gap-2 text-xs text-danger">
+              <WarningCircleIcon size={15} /> {t.offline.failed(s.failed)}
+              <button type="button" onClick={s.retryFailed} className="font-semibold underline underline-offset-2">
+                {t.offline.retry}
+              </button>
+            </p>
+            <RemoveSkippedButton />
+          </div>
         )}
       </div>
 
@@ -367,6 +374,7 @@ export function DownloadsPanel() {
           <div className="flex flex-col gap-2 rounded-[16px] bg-surface-1 p-4 ring-1 ring-line">
             <p className="text-xs font-semibold tracking-[0.12em] text-accent-text uppercase">
               {a.phase === "download" ? t.offline.phaseDownloadTitle : t.offline.phaseCompressTitle}
+              {a.phase === "download" && (a.source ?? 1) > 1 && <span className="ml-2 normal-case">· {t.offline.source(a.source!)}</span>}
             </p>
             <p className="truncate font-semibold">{a.title}</p>
             <span className="h-2 overflow-hidden rounded-full bg-surface-4">
@@ -377,8 +385,10 @@ export function DownloadsPanel() {
             </span>
             <p className="text-xs text-fg-2">
               {a.phase === "download"
-                ? a.note === "resolving" && !a.received
-                  ? t.offline.resolving
+                ? (a.note === "resolving" || a.note === "alternative") && !a.received
+                  ? a.note === "alternative"
+                    ? t.offline.tryingAlternative
+                    : t.offline.resolving
                   : `${mb(a.received ?? 0)}${a.total ? ` / ${mb(a.total)}` : ""} · ${Math.round(speed / 1024)} KB/s`
                 : t.offline.compressing(Math.round(a.progress * 100))}
             </p>
@@ -418,16 +428,55 @@ export function DownloadsPanel() {
                 </li>
               ))}
             </ul>
-            <button
-              type="button"
-              onClick={retryFailed}
-              className="h-10 self-start rounded-full bg-accent px-4 text-sm font-semibold text-accent-ink"
-            >
-              {t.offline.retrySkipped}
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={retryFailed}
+                className="h-10 rounded-full bg-accent px-4 text-sm font-semibold text-accent-ink"
+              >
+                {t.offline.retrySkipped}
+              </button>
+              <RemoveSkippedButton />
+            </div>
           </div>
         )}
       </div>
     </Modal>
+  );
+}
+
+/** Takes the songs that couldn't be downloaded out of the downloaded playlists, after asking. */
+function RemoveSkippedButton() {
+  const t = useT();
+  const count = useOffline((s) => Object.keys(s.failed).length);
+  const removeSkipped = useOffline((s) => s.removeSkipped);
+  const [confirm, setConfirm] = useState(false);
+  if (!count) return null;
+  return confirm ? (
+    <span className="flex flex-wrap items-center gap-2 rounded-[14px] bg-surface-1 p-2 text-xs ring-1 ring-danger/40">
+      <span className="px-1 text-fg-2">{t.offline.removeSkippedConfirm(count)}</span>
+      <button type="button" onClick={() => setConfirm(false)} className="h-8 rounded-full px-3 text-fg-2 hover:text-fg">
+        {t.common.cancel}
+      </button>
+      <button
+        type="button"
+        onClick={async () => {
+          setConfirm(false);
+          const n = await removeSkipped();
+          toast(t.offline.removedSkipped(n));
+        }}
+        className="h-8 rounded-full bg-danger px-3 font-semibold text-white"
+      >
+        {t.offline.removeSkippedYes}
+      </button>
+    </span>
+  ) : (
+    <button
+      type="button"
+      onClick={() => setConfirm(true)}
+      className="flex h-10 items-center gap-2 self-start rounded-full bg-surface-1 px-4 text-sm font-medium text-danger ring-1 ring-line hover:bg-danger/10"
+    >
+      <TrashIcon size={16} /> {t.offline.removeSkipped(count)}
+    </button>
   );
 }
