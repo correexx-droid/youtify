@@ -1,7 +1,7 @@
 {
   "name": "youtify-mobile",
   "productName": "YoutiFy Mobile",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "The YoutiFy phone app as a PC program.",
   "author": "YoutiFy",
   "main": "dist/main.cjs",

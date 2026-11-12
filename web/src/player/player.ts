@@ -48,6 +48,8 @@ interface PlayerState {
   playNext: (track: Track) => void;
   addToQueue: (track: Track) => void;
   removeAt: (i: number) => void;
+  /** Moves an upcoming song to another place among the upcoming ones (indexes into the queue). */
+  moveInQueue: (from: number, to: number) => void;
   jumpTo: (i: number) => void;
   clearUpcoming: () => void;
   startRadio: (track: Track) => Promise<void>;
@@ -497,6 +499,17 @@ export const usePlayer = create<PlayerState>((set, get) => {
       if (!s.queue.length) return get().playList([track]);
       set({ queue: [...s.queue, track], original: s.original ? [...s.original, track] : null });
       toast(getT().player.addedToQueue(track.title));
+    },
+
+    moveInQueue: (from, to) => {
+      const s = get();
+      const first = s.index + 1;
+      if (from === to || from < first || from >= s.queue.length) return;
+      const target = Math.max(first, Math.min(to, s.queue.length - 1));
+      const queue = [...s.queue];
+      const [track] = queue.splice(from, 1);
+      queue.splice(target, 0, track!);
+      set({ queue });
     },
 
     removeAt: (i) => {

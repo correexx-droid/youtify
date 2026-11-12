@@ -251,7 +251,7 @@ export function SettingsDialog() {
         )}
 
         <p className="pt-2 pb-1 text-center text-xs text-fg-3">
-          YoutiFy {__APP_VERSION__.replace(/\.0$/, "")} · <span className="font-semibold text-accent-text">Made by Kai A.</span>
+          YoutiFy {__APP_VERSION__.replace(/\.0$/, "")} · <span className="font-semibold text-accent-text">Made by Ka I.</span>
         </p>
       </div>
     </Modal>
