@@ -16,7 +16,7 @@ import { useUi } from "../stores/ui";
 import { BackupSection } from "./BackupSection";
 import { OfflineSection } from "./Offline";
 import { SpotifySection } from "./SpotifySection";
-import { AccentPicker, LayoutSection } from "./CustomizeSection";
+import { AccentPicker, LayoutSection, ThemePicker } from "./CustomizeSection";
 import { Modal } from "./Modal";
 
 function Segmented<T extends string>({
@@ -139,6 +139,7 @@ export function SettingsDialog() {
               ["light", <><SunIcon size={15} /> {t.settings.light}</>],
             ]}
           />
+          <ThemePicker />
           <AccentPicker />
         </section>
 

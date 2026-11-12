@@ -2,8 +2,70 @@ import { CheckIcon, PaletteIcon } from "@phosphor-icons/react";
 import { useT } from "../i18n";
 import { inkFor } from "../lib/accent";
 import { cn } from "../lib/format";
-import { ACCENTS, useAppearance } from "../stores/appearance";
+import { ACCENTS, THEMES, useAppearance } from "../stores/appearance";
 import { useUi } from "../stores/ui";
+
+/** Colour world for the whole design: ready-made ones (each with a fitting accent) or any colour. */
+export function ThemePicker() {
+  const t = useT();
+  const theme = useAppearance((s) => s.theme);
+  const set = useAppearance((s) => s.set);
+  const custom = !!theme && !THEMES.some((x) => x.theme === theme);
+  return (
+    <div className="flex flex-col gap-2.5">
+      <p className="text-[13px] text-fg-2">{t.customize.theme}</p>
+      <div role="radiogroup" aria-label={t.customize.theme} className="grid grid-cols-4 gap-2 sm:grid-cols-5">
+        {THEMES.map((x) => {
+          const on = theme === x.theme;
+          const base = x.theme || "#7c3aed";
+          return (
+            <button
+              key={x.id}
+              type="button"
+              role="radio"
+              aria-checked={on}
+              onClick={() => set({ theme: x.theme, accent: x.accent })}
+              className={cn(
+                "flex flex-col items-center gap-1.5 rounded-[14px] p-2 text-[11px] font-medium ring-1 transition-colors",
+                on ? "bg-accent-soft text-fg ring-accent/60" : "text-fg-2 ring-line hover:bg-surface-3",
+              )}
+            >
+              <span
+                className="relative grid h-9 w-full place-items-center overflow-hidden rounded-[10px]"
+                style={{ background: `linear-gradient(135deg, color-mix(in oklab, ${base}, black 72%), color-mix(in oklab, ${base}, black 45%))` }}
+              >
+                <span className="size-3.5 rounded-full" style={{ background: x.accent }} />
+                {on && <CheckIcon size={12} weight="bold" className="absolute top-1 right-1 text-white" />}
+              </span>
+              {t.customize.themes[x.id]}
+            </button>
+          );
+        })}
+        <label
+          className={cn(
+            "relative flex cursor-pointer flex-col items-center gap-1.5 rounded-[14px] p-2 text-[11px] font-medium ring-1 transition-colors",
+            custom ? "bg-accent-soft text-fg ring-accent/60" : "text-fg-2 ring-line hover:bg-surface-3",
+          )}
+        >
+          <span
+            className="grid h-9 w-full place-items-center rounded-[10px]"
+            style={{ background: custom ? theme : "conic-gradient(#f43f5e, #fbbf24, #a3e635, #22d3ee, #6366f1, #d946ef, #f43f5e)" }}
+          >
+            <PaletteIcon size={15} weight="bold" className="text-white drop-shadow" />
+          </span>
+          {t.customize.customTheme}
+          <input
+            type="color"
+            value={theme || "#7c3aed"}
+            onChange={(e) => set({ theme: e.target.value })}
+            className="absolute inset-0 cursor-pointer opacity-0"
+            aria-label={t.customize.customTheme}
+          />
+        </label>
+      </div>
+    </div>
+  );
+}
 
 /** Ready-made accent swatches plus any colour from the system picker. */
 export function AccentPicker() {

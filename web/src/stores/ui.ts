@@ -1,6 +1,17 @@
+import { themeBg } from "../lib/theme";
 import { create } from "zustand";
 import { desktop } from "../lib/desktop";
 import type { Track } from "../lib/types";
+
+/** Status bar colour: the dark background of the chosen colour world. */
+function darkBarColor(): string {
+  try {
+    const t = JSON.parse(localStorage.getItem("musike:appearance") ?? "{}").theme;
+    return typeof t === "string" && /^#[0-9a-f]{6}$/i.test(t) ? themeBg(t) : "#0A0613";
+  } catch {
+    return "#0A0613";
+  }
+}
 
 export interface ToastAction {
   label: string;
@@ -80,7 +91,7 @@ export const useUi = create<UiState>((set, get) => ({
 
   setTheme: (theme) => {
     document.documentElement.dataset.theme = theme;
-    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", theme === "dark" ? "#0A0613" : "#EFE9FA");
+    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", theme === "dark" ? darkBarColor() : "#EFE9FA");
     desktop?.setTheme(theme);
     try {
       localStorage.setItem("musike:theme", theme);

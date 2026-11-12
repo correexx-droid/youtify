@@ -504,6 +504,18 @@ export const en = {
 
   customize: {
     accent: "Accent color",
+    theme: "Color world (whole design)",
+    customTheme: "Own",
+    themes: {
+      purple: "Purple",
+      ocean: "Ocean",
+      forest: "Forest",
+      ember: "Ember",
+      rose: "Rosé",
+      gold: "Gold",
+      teal: "Lagoon",
+      graphite: "Graphite",
+    },
     customColor: "Custom color",
     colors: {
       purple: "Purple",

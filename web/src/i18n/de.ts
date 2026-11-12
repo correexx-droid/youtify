@@ -498,6 +498,18 @@ export const de: Messages = {
 
   customize: {
     accent: "Akzentfarbe",
+    theme: "Farbwelt (ganzes Design)",
+    customTheme: "Eigene",
+    themes: {
+      purple: "Lila",
+      ocean: "Ozean",
+      forest: "Wald",
+      ember: "Glut",
+      rose: "Rosé",
+      gold: "Gold",
+      teal: "Lagune",
+      graphite: "Graphit",
+    },
     customColor: "Eigene Farbe",
     colors: {
       purple: "Lila",
