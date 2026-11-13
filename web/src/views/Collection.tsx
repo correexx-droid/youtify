@@ -1,4 +1,4 @@
-import { DotsThreeIcon, MagnifyingGlassIcon, PauseIcon, PencilSimpleIcon, PlayIcon, ShuffleIcon, TrashIcon } from "@phosphor-icons/react";
+import { DotsThreeIcon, MagnifyingGlassIcon, PauseIcon, PencilSimpleIcon, PlayIcon, ShuffleIcon, TrashIcon, ShareNetworkIcon } from "@phosphor-icons/react";
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { Cover, type CoverKind } from "../components/Cover";
@@ -7,6 +7,7 @@ import { IconButton, PlayDisc } from "../components/IconButton";
 import { Modal } from "../components/Modal";
 import { EmptyState, PageHeader } from "../components/Page";
 import { DownloadButton } from "../components/Offline";
+import { sharePlaylist } from "../components/ShareDialog";
 import { TrackList } from "../components/TrackList";
 import { pinKeyFor } from "../stores/offline";
 import { useT } from "../i18n";
@@ -110,6 +111,14 @@ export default function Collection({ kind }: Props) {
         </IconButton>
         {kind !== "history" && pinKeyFor(kind, playlist?.id) && (
           <DownloadButton pinKey={pinKeyFor(kind, playlist?.id)!} name={name} tracks={tracks} />
+        )}
+        {kind !== "history" && tracks.length > 0 && (
+          <IconButton
+            label={t.share.action}
+            onClick={() => sharePlaylist(name, tracks)}
+          >
+            <ShareNetworkIcon size={22} />
+          </IconButton>
         )}
         {kind === "playlist" && (
           <IconButton label={t.collection.more} size="lg" onClick={() => setMoreOpen(true)}>

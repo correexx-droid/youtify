@@ -2,6 +2,7 @@ import {
   BooksIcon,
   ClockCounterClockwiseIcon,
   GearSixIcon,
+  UsersThreeIcon,
   HeartIcon,
   HouseIcon,
   MagnifyingGlassIcon,
@@ -12,6 +13,7 @@ import { NavLink, useNavigate } from "react-router";
 import { playlistContextMenu } from "./PlaylistMenu";
 import { useT } from "../i18n";
 import { cn } from "../lib/format";
+import { useJam } from "../lib/jam";
 import { paths } from "../lib/routes";
 import { useAppearance } from "../stores/appearance";
 import { useLibrary } from "../stores/library";
@@ -26,6 +28,28 @@ const nav = [
   { to: paths.search, key: "search", Icon: MagnifyingGlassIcon, end: false },
   { to: paths.library, key: "library", Icon: BooksIcon, end: false },
 ] as const;
+
+/** Jam session entry: lights up while a jam runs. */
+function JamButton() {
+  const t = useT();
+  const active = useJam((s) => !!s.hosting || !!s.joined);
+  const open = useJam((s) => s.setDialogOpen);
+  return (
+    <button
+      type="button"
+      onClick={() => open(true)}
+      aria-label={t.jam.title}
+      title={t.jam.title}
+      className={cn(
+        "relative flex h-10 w-full items-center justify-center gap-2 rounded-full px-3 text-sm transition-colors wide:justify-start",
+        active ? "bg-accent-soft text-accent-text" : "text-fg-2 hover:bg-surface-3 hover:text-fg",
+      )}
+    >
+      <UsersThreeIcon size={19} />
+      <span className="hidden flex-1 text-left wide:inline">{t.jam.button}</span>
+    </button>
+  );
+}
 
 /** Settings entry. Shows a dot (and on the wide rail, an "Update" pill) when yt-dlp needs attention. */
 function SettingsButton() {
@@ -185,7 +209,8 @@ export function Rail() {
           ))}
         </div>
 
-        <div className="flex border-t border-line p-2">
+        <div className="flex flex-col gap-1 border-t border-line p-2">
+          <JamButton />
           <SettingsButton />
         </div>
       </div>

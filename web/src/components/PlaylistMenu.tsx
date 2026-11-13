@@ -1,4 +1,4 @@
-import { DotsThreeVerticalIcon, PencilSimpleIcon, PlayIcon, ShuffleIcon, TrashIcon } from "@phosphor-icons/react";
+import { DotsThreeVerticalIcon, PencilSimpleIcon, PlayIcon, ShareNetworkIcon, ShuffleIcon, TrashIcon } from "@phosphor-icons/react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
@@ -13,6 +13,7 @@ import { useLibrary } from "../stores/library";
 import { Cover } from "./Cover";
 import { NamePlaylistDialog } from "./Dialogs";
 import { Modal } from "./Modal";
+import { sharePlaylist } from "./ShareDialog";
 
 /**
  * Actions for a playlist in the sidebar and the library: right-click on a PC, the ⋮ button on a phone.
@@ -135,6 +136,9 @@ export function PlaylistMenu() {
         onClick={run(() => playlist.tracks.length && usePlayer.getState().playList(shuffled(playlist.tracks), 0))}
       >
         {t.collection.shuffle}
+      </Item>
+      <Item icon={<ShareNetworkIcon size={18} />} onClick={run(() => sharePlaylist(playlist.name, playlist.tracks))}>
+        {t.share.action}
       </Item>
       <div className="mx-3 my-1 h-px bg-line" />
       <Item icon={<PencilSimpleIcon size={18} />} onClick={run(() => usePlaylistMenu.setState({ renaming: playlist.id }))}>

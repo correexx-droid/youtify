@@ -12,6 +12,7 @@ public class MainActivity extends BridgeActivity {
     protected void onCreate(Bundle savedInstanceState) {
         registerPlugin(MusikePlaybackPlugin.class);
         registerPlugin(MusikeDevicePlugin.class);
+        registerPlugin(JamServerPlugin.class);
         super.onCreate(savedInstanceState);
         // Draw behind the status and navigation bars on every Android version; the page pads itself
         // (env(safe-area-inset-*)) and the SystemBars plugin keeps the icons readable for the theme.

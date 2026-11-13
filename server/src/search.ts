@@ -260,6 +260,72 @@ export async function genreRadio(id: string): Promise<Track[]> {
   return out;
 }
 
+/**
+ * Song details for a list of video ids (for shared YoutiFy codes): one YouTube Music queue request per 50 ids,
+ * and YouTube's public oEmbed for any id that request leaves without a title.
+ */
+export async function tracksByIds(ids: string[]): Promise<Track[]> {
+  const wanted = [...new Set(ids.filter((id) => VIDEO_ID.test(id)))].slice(0, 5000);
+  const found = new Map<string, Track>();
+  const runs = (v: any) => (v?.runs ?? []).map((r: any) => r.text).join("");
+  const clock = (v: string) => (/^\d+(:\d{1,2}){1,2}$/.test(v) ? v.split(":").reduce((a, p) => a * 60 + Number(p), 0) : 0);
+  for (let i = 0; i < wanted.length; i += 50) {
+    const chunk = wanted.slice(i, i + 50);
+    try {
+      await withClient(async (yt: any) => {
+        const r: any = await yt.actions.execute("/music/get_queue", { videoIds: chunk, client: "YTMUSIC" });
+        for (const q of (r?.data ?? r)?.queueDatas ?? []) {
+          const v = q?.content?.playlistPanelVideoRenderer ?? q?.content?.playlistPanelVideoWrapperRenderer?.primaryRenderer?.playlistPanelVideoRenderer;
+          const id = v?.videoId;
+          const title = runs(v?.title);
+          if (!id || !title) continue;
+          const byline: string[] = runs(v?.longBylineText ?? v?.shortBylineText).split(" • ");
+          const thumbs: any[] = v?.thumbnail?.thumbnails ?? [];
+          found.set(id, {
+            id,
+            title,
+            artist: byline[0] ?? "",
+            album: byline.length > 2 ? byline[1] : undefined,
+            duration: clock(runs(v?.lengthText)),
+            thumb: thumbs[0]?.url ?? `https://i.ytimg.com/vi/${id}/mqdefault.jpg`,
+            art: thumbs.at(-1)?.url ?? `https://i.ytimg.com/vi/${id}/hqdefault.jpg`,
+            kind: "song",
+          });
+        }
+      });
+    } catch {
+      /* fall back to oEmbed below */
+    }
+  }
+  const missing = wanted.filter((id) => !found.has(id));
+  const doFetch = config.fetch ?? fetch;
+  let next = 0;
+  const worker = async () => {
+    while (next < missing.length) {
+      const id = missing[next++]!;
+      try {
+        const res = await doFetch(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(`https://www.youtube.com/watch?v=${id}`)}`);
+        if (!res.ok) continue;
+        const o = (await res.json()) as { title?: string; author_name?: string };
+        if (!o.title) continue;
+        found.set(id, {
+          id,
+          title: o.title,
+          artist: (o.author_name ?? "").replace(/\s*-\s*Topic$/i, "").replace(/VEVO$/i, ""),
+          duration: 0,
+          thumb: `https://i.ytimg.com/vi/${id}/mqdefault.jpg`,
+          art: `https://i.ytimg.com/vi/${id}/hqdefault.jpg`,
+          kind: "video",
+        });
+      } catch {
+        /* unknown video: left out */
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(6, missing.length) }, worker));
+  return wanted.map((id) => found.get(id)).filter((t): t is Track => !!t);
+}
+
 export async function radio(id: string): Promise<Track[]> {
   const panel = await withClient((yt) => yt.music.getUpNext(id, true));
   return (panel.contents ?? [])

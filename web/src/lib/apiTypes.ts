@@ -76,6 +76,8 @@ export interface MusikeApi {
   radio(id: string): Promise<Track[]>;
   /** Songs in the same genre as `id` (for the genre mix). */
   genreRadio(id: string): Promise<Track[]>;
+  /** Song details for video ids (shared YoutiFy codes). */
+  tracksByIds(ids: string[]): Promise<Track[]>;
   genres(): Promise<Genre[]>;
   genre(id: string, signal?: AbortSignal): Promise<GenrePage>;
   genreArtists(id: string, offset: number): Promise<{ artists: GenreArtist[]; hasMore: boolean }>;

@@ -1,3 +1,4 @@
+import { shareSongs } from "./ShareDialog";
 import {
   ArrowSquareOutIcon,
   HeartIcon,
@@ -6,8 +7,7 @@ import {
   PlaylistIcon,
   QueueIcon,
   RadioIcon,
-  TrashIcon,
-} from "@phosphor-icons/react";
+  TrashIcon, ShareNetworkIcon } from "@phosphor-icons/react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
@@ -109,6 +109,9 @@ export function TrackMenu() {
       )}
       {menu.track.kind !== "local" && (
         <>
+          <Item icon={<ShareNetworkIcon size={18} />} onClick={run(() => shareSongs([menu.track]))}>
+            {t.share.action}
+          </Item>
           <div className="mx-3 my-1 h-px bg-line" />
           <Item
             icon={<ArrowSquareOutIcon size={18} />}

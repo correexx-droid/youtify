@@ -19,6 +19,7 @@ import { Artwork } from "./Artwork";
 import { FavoriteButton, ModeSwitch, Scrubber, Transport, GenreMixToggle } from "./Controls";
 import { IconButton } from "./IconButton";
 import { LyricsCard, LyricsView } from "./Lyrics";
+import { JamBar } from "./JamDialog";
 import { QueueList } from "./Queue";
 import { SLOT, VideoSlot } from "./Video";
 
@@ -97,7 +98,13 @@ function PanelBody({ tab, slot }: { tab: PanelTab; slot: number }) {
   const t = useT();
   const openPanel = useUi((s) => s.openPanel);
 
-  if (tab === "queue") return <QueueList />;
+  if (tab === "queue")
+    return (
+      <>
+        <JamBar />
+        <QueueList />
+      </>
+    );
   if (!track) {
     return <p className="px-2 py-16 text-center text-sm text-fg-2">{t.nowPlaying.playSomething}</p>;
   }
@@ -316,6 +323,7 @@ export function NowPlayingSheet({ open, onClose }: { open: boolean; onClose: () 
 
             {view === "queue" ? (
               <div className="scroll-area -mx-3 flex-1 overflow-y-auto pb-6">
+                <JamBar />
                 <QueueList />
               </div>
             ) : view === "lyrics" ? (

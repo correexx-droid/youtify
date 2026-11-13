@@ -4,6 +4,8 @@ import { AddToPlaylistDialog, ShortcutsDialog } from "./components/Dialogs";
 import { ImportFilesDialog } from "./components/ImportFiles";
 import { ImportPlaylistDialog } from "./components/ImportPlaylist";
 import { PlaylistMenu } from "./components/PlaylistMenu";
+import { JamDialog } from "./components/JamDialog";
+import { ShareDialog } from "./components/ShareDialog";
 import { DownloadIndicator, DownloadsPanel } from "./components/Offline";
 import { MiniPlayer, TabBar } from "./components/MobileChrome";
 import { NowPlayingSheet, PanelDrawer, SidePanel } from "./components/NowPlaying";
@@ -161,6 +163,8 @@ export default function App() {
       <ImportPlaylistDialog />
       <ImportFilesDialog />
       <PlaylistMenu />
+      <ShareDialog />
+      <JamDialog />
       <DownloadIndicator />
       <DownloadsPanel />
       <ShortcutsDialog />

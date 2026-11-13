@@ -7,7 +7,7 @@ import { ALBUM_ID, album, ARTIST_ID, artist, GENRE_ID, genre, genreArtists, genr
 import { config } from "./config.js";
 import * as library from "./library.js";
 import { fileStorage } from "./libraryFile.js";
-import { findVideoFor, genreRadio, radio, search, suggestions } from "./search.js";
+import { findVideoFor, genreRadio, radio, search, suggestions, tracksByIds } from "./search.js";
 import { proxyStream, serveFile } from "./stream.js";
 import { langOf, msg, tr } from "./i18n.js";
 import { presentJob, startJob, systemInfo, type Channel } from "./system.js";
@@ -187,6 +187,12 @@ export async function startServer(opts: StartOptions = {}): Promise<RunningServe
   app.delete("/api/favorites/:id", async (req) => ({ favorites: await library.removeFavorite(videoId(req.params)) }));
 
   app.post("/api/history", async (req) => ({ history: await library.pushHistory(library.sanitizeTrack(req.body)) }));
+
+  /** Song details for shared YoutiFy codes (video ids only). */
+  app.post("/api/tracks", async (req) => {
+    const { ids } = (req.body ?? {}) as { ids?: unknown };
+    return { tracks: await tracksByIds(Array.isArray(ids) ? ids.filter((x): x is string => typeof x === "string") : []) };
+  });
 
   app.post("/api/playlists", async (req) => {
     const body = (req.body ?? {}) as { name?: unknown; tracks?: unknown };

@@ -7,6 +7,8 @@
  * each request over IPC and Node's fetch sends it with exactly the headers the app set.
  */
 import { app, BrowserWindow, ipcMain, Menu, net, protocol, shell } from "electron";
+import { registerFsBridge } from "./fsBridge";
+import { registerJamBridge } from "./jamBridge";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -161,6 +163,8 @@ else {
   });
 
   app.whenReady().then(() => {
+    registerFsBridge();
+    registerJamBridge();
     // The app's files; unknown paths get index.html (the app routes by itself).
     protocol.handle(SCHEME, (request) => {
       const url = new URL(request.url);

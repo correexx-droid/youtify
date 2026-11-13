@@ -15,7 +15,7 @@ import {
 import { msg, tr, type MsgKey } from "../../../server/src/i18n";
 import { readPlaylistLink } from "../../../server/src/importLink";
 import * as library from "../../../server/src/library";
-import { findVideoFor, radio, search, suggestions, genreRadio} from "../../../server/src/search";
+import { findVideoFor, radio, search, suggestions, genreRadio, tracksByIds} from "../../../server/src/search";
 import { HttpError, VIDEO_ID } from "../../../server/src/types";
 import { getLang, getT } from "../i18n";
 import { ApiError, type MusikeApi, type SystemInfo } from "../lib/apiTypes";
@@ -68,6 +68,7 @@ export const api: MusikeApi = {
   suggest: (q, signal) => call(() => suggestions(q.trim().slice(0, 100), getLang()).catch(() => []), signal),
   radio: (id) => call(() => radio(id)),
   genreRadio: (id) => call(() => genreRadio(id)),
+  tracksByIds: (ids) => call(() => tracksByIds(ids)),
   genres: () => call(() => genres(getLang())),
   genre: (id, signal) =>
     call(async () => {

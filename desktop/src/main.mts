@@ -4,6 +4,8 @@ import { fileURLToPath } from "node:url";
 import { app, BrowserWindow, ipcMain, Menu, screen, shell } from "electron";
 import type { RunningServer } from "../../server/src/app.js";
 import { backupLibraryOnUpdate } from "./backup.js";
+import { registerFsBridge } from "./fsBridge.js";
+import { registerJamBridge } from "./jamBridge.js";
 
 // No top-level await in this file: Electron only fires "ready" after the entry module finishes
 // evaluating, so awaiting it at the top level would hang forever.
@@ -220,6 +222,8 @@ app.on("window-all-closed", () => app.quit());
 app.on("before-quit", () => void server?.close());
 
 void app.whenReady().then(() => {
+  registerFsBridge();
+  registerJamBridge();
   // macOS needs an app menu: without the Edit menu, Cmd+C/V/A don't reach text fields, and Cmd+Q has no home.
   Menu.setApplicationMenu(
     isMac ? Menu.buildFromTemplate([{ role: "appMenu" }, { role: "editMenu" }, { role: "windowMenu" }]) : null,

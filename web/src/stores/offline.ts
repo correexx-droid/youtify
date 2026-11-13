@@ -5,6 +5,8 @@ import { downloadAudio } from "../lib/api";
 import type { Library, Track } from "../lib/types";
 import { canTranscode, compressTrack } from "../lib/transcode";
 import { decodeYtfy, encodeYtfy, ytfyToBlob } from "../lib/ytfy";
+import { externalStore, type StoreId } from "../lib/fileStores";
+import { downloadFree, freeSources } from "../lib/freeMusic";
 import { useLibrary } from "./library";
 
 /**
@@ -30,6 +32,8 @@ export interface OfflineItem {
   local?: boolean;
   /** Downloaded and stored as-is; the compression pass still has to shrink it. */
   pendingCompress?: boolean;
+  /** Where the file is (lib/fileStores.ts); missing = inside the app. */
+  store?: StoreId;
 }
 
 export interface ActiveJob {
@@ -47,6 +51,10 @@ export interface ActiveJob {
   note?: string;
   /** Which source is being tried (1 = the song's own video, 2–3 = other uploads of the same song). */
   source?: number;
+  /** How many sources this attempt has. */
+  sources?: number;
+  /** Second pass for songs the first three sources didn't give. */
+  deep?: boolean;
 }
 
 /** One source (YouTube video) gets this long before the next one is tried. */
@@ -122,21 +130,97 @@ function tx<T>(stores: string[], mode: IDBTransactionMode, run: (t: IDBTransacti
   );
 }
 
-const putSong = (item: OfflineItem, file: Uint8Array) =>
-  tx(["files", "items"], "readwrite", (t) => {
-    t.objectStore("files").put(file, item.id);
-    t.objectStore("items").put(item);
+const STORE_KEY = "youtify:offline-store";
+
+/** Where new downloads go. */
+export function currentStore(): StoreId {
+  try {
+    return (localStorage.getItem(STORE_KEY) as StoreId | null) ?? "app";
+  } catch {
+    return "app";
+  }
+}
+
+export function setCurrentStore(id: StoreId) {
+  try {
+    localStorage.setItem(STORE_KEY, id);
+  } catch {
+    /* private mode */
+  }
+}
+
+const readItem = (id: string) => tx<OfflineItem | undefined>(["items"], "readonly", (t) => t.objectStore("items").get(id));
+
+/** Saves a song's file in the item's store (or the current one) and its entry in IndexedDB. */
+async function putSong(item: OfflineItem, file: Uint8Array) {
+  const store = item.store ?? currentStore();
+  if (store === "app") {
+    const { store: _drop, ...rest } = item;
+    void _drop;
+    return tx(["files", "items"], "readwrite", (t) => {
+      t.objectStore("files").put(file, item.id);
+      t.objectStore("items").put(rest);
+    });
+  }
+  await (await externalStore(store)).put(item.id, file);
+  await tx(["files", "items"], "readwrite", (t) => {
+    t.objectStore("files").delete(item.id);
+    t.objectStore("items").put({ ...item, store });
   });
-const deleteSong = (id: string) =>
-  tx(["files", "items"], "readwrite", (t) => {
+}
+
+async function deleteSong(id: string) {
+  const item = await readItem(id).catch(() => undefined);
+  if (item?.store && item.store !== "app") await (await externalStore(item.store)).remove(id).catch(() => {});
+  return tx(["files", "items"], "readwrite", (t) => {
     t.objectStore("files").delete(id);
     t.objectStore("items").delete(id);
   });
+}
 const putItem = (item: OfflineItem) =>
   tx(["items"], "readwrite", (t) => {
     t.objectStore("items").put(item);
   });
-const readFile = (id: string) => tx<Uint8Array | undefined>(["files"], "readonly", (t) => t.objectStore("files").get(id));
+async function readFile(id: string): Promise<Uint8Array | undefined> {
+  const item = await readItem(id);
+  if (item?.store && item.store !== "app") return (await externalStore(item.store)).get(id);
+  return tx<Uint8Array | undefined>(["files"], "readonly", (t) => t.objectStore("files").get(id));
+}
+
+/**
+ * Moves every saved song into `target`, oldest first. A song is only removed from its old place once the copy
+ * is written. Returns how many moved and how many failed.
+ */
+export async function moveDownloads(
+  target: StoreId,
+  onProgress?: (done: number, total: number) => void,
+): Promise<{ moved: number; failed: number }> {
+  const items = (await readItems()).filter((i) => (i.store ?? "app") !== target);
+  let moved = 0;
+  let failed = 0;
+  for (const [n, item] of items.entries()) {
+    onProgress?.(n, items.length);
+    try {
+      const file = await readFile(item.id);
+      if (!file) throw new Error("missing");
+      const from = item.store ?? "app";
+      await putSong({ ...item, store: target }, file);
+      if (from !== "app") await (await externalStore(from)).remove(item.id).catch(() => {});
+      moved++;
+    } catch {
+      failed++;
+    }
+  }
+  onProgress?.(items.length, items.length);
+  return { moved, failed };
+}
+
+/** Number and size of the saved songs not in `target`. */
+export async function downloadsOutside(target: StoreId): Promise<{ count: number; bytes: number }> {
+  const items = (await readItems().catch(() => [] as OfflineItem[])).filter((i) => (i.store ?? "app") !== target);
+  return { count: items.length, bytes: items.reduce((a, i) => a + i.stored, 0) };
+}
+
 const readItems = () => tx<OfflineItem[]>(["items"], "readonly", (t) => t.objectStore("items").getAll());
 
 // ---------------------------------------------------------------- Wi-Fi
@@ -325,6 +409,7 @@ export const useOffline = create<OfflineState>((set, get) => ({
     set({ quality });
   },
   retryFailed: () => {
+    deepTried.clear();
     set({ failed: {}, failedTitles: {} });
     sync();
   },
@@ -438,6 +523,15 @@ async function work(wanted: Map<string, Track>) {
       await saveOne(track);
       useOffline.setState((st) => ({ queue: st.queue.filter((q) => q !== id) }));
     }
+    // Deep search for skipped songs (once each), then they stay skipped as always.
+    for (;;) {
+      if (syncAgain || !canDownloadNow()) break;
+      const st = useOffline.getState();
+      const wanted = wantedTracks();
+      const id = Object.keys(st.failed).find((f) => !deepTried.has(f) && wanted.has(f) && !st.items[f]);
+      if (!id) break;
+      await deepSave(wanted.get(id)!);
+    }
     // Everything downloaded: now shrink the songs that are still stored as downloaded (first download, then compress).
     for (;;) {
       if (syncAgain) break;
@@ -483,6 +577,141 @@ async function compressOne(item: OfflineItem) {
   if (useOffline.getState().items[item.id]) useOffline.setState((s) => ({ items: { ...s.items, [item.id]: done } }));
 }
 
+/** Songs the deep search already went through (cleared by "try again"). */
+const deepTried = new Set<string>();
+const DEEP_SOURCES = 10;
+
+/**
+ * Deep search for a song none of its first three sources would give: more uploads of it on YouTube and YouTube
+ * Music (official audio, topic channels, lyric and live videos, re-uploads), several search phrasings, a looser
+ * length match. Up to ten of them, in order of how well they fit.
+ */
+async function deepSources(track: Track, skip: Set<string>): Promise<string[]> {
+  const { lyricsQuery } = await import("../lib/lyrics");
+  const { api } = await import("../lib/api");
+  const q = lyricsQuery(track);
+  const base = [q.artist, q.title].filter(Boolean).join(" ");
+  const phrasings: [string, "song" | "video"][] = [
+    [base, "song"],
+    [`${base} official audio`, "video"],
+    [`${base} lyrics`, "video"],
+    [`${q.title} ${q.artist} topic`, "video"],
+    [`${base} audio`, "video"],
+    [`${base} live`, "video"],
+  ];
+  const out: { id: string; score: number }[] = [];
+  const seen = new Set(skip);
+  for (const [phrase, type] of phrasings) {
+    if (out.length >= DEEP_SOURCES * 2) break;
+    try {
+      for (const t of await api.search(phrase, type)) {
+        if (seen.has(t.id) || t.kind === "local") continue;
+        seen.add(t.id);
+        const off = track.duration && t.duration ? Math.abs(t.duration - track.duration) : 15;
+        if (off > 45) continue;
+        const sameTitle = t.title.toLowerCase().includes(q.title.toLowerCase().slice(0, 20)) ? 0 : 20;
+        out.push({ id: t.id, score: off + sameTitle });
+      }
+    } catch {
+      /* next phrasing */
+    }
+  }
+  return out
+    .sort((a, b) => a.score - b.score)
+    .slice(0, DEEP_SOURCES)
+    .map((x) => x.id);
+}
+
+/** Tries the sources in order until one downloads; reports progress through `update`. */
+async function downloadFrom(
+  list: string[],
+  update: (patch: Partial<ActiveJob>) => void,
+  opts: { deep?: boolean; total?: number; offset?: number; timeout?: number } = {},
+): Promise<{ bytes: Uint8Array; mime: string }> {
+  const offset = opts.offset ?? 0;
+  let lastError: Error = new Error("failed");
+  for (const [n, source] of list.entries()) {
+    update({
+      source: offset + n + 1,
+      sources: opts.total ?? offset + list.length,
+      deep: !!opts.deep,
+      received: 0,
+      total: null,
+      progress: 0,
+      lastDataAt: Date.now(),
+      note: offset + n || opts.deep ? "alternative" : "resolving",
+    });
+    try {
+      const got = await withTimeout(
+        downloadAudio(source, (done, total) =>
+          update({ received: done, total, progress: total ? Math.min(1, done / total) : 0, lastDataAt: Date.now(), note: undefined }),
+        ),
+        opts.timeout ?? SONG_TIMEOUT_MS,
+        "timeout",
+      );
+      if (got.bytes.length) return got;
+      lastError = new Error("empty download");
+    } catch (e) {
+      lastError = e as Error;
+    }
+  }
+  throw lastError;
+}
+
+async function deepSave(track: Track) {
+  deepTried.add(track.id);
+  let job: ActiveJob = { id: track.id, title: track.title, phase: "download", progress: 0, startedAt: Date.now(), deep: true, note: "searching" };
+  const update = (patch: Partial<ActiveJob>) => {
+    job = { ...job, ...patch };
+    useOffline.setState({ active: job });
+  };
+  update({});
+  try {
+    const sources = await deepSources(track, new Set([track.id])).catch(() => [] as string[]);
+    const got = await (sources.length ? downloadFrom(sources, update, { deep: true, timeout: 90_000 }) : Promise.reject(new Error("no sources"))).catch(
+      async (e) => {
+        // YouTube has nothing more: free, licensed copies (Audius, Internet Archive).
+        update({ note: "searching", source: undefined, sources: undefined });
+        for (const src of await freeSources(track).catch(() => [])) {
+          update({ note: `free:${src.name}`, received: 0, total: null });
+          try {
+            return await withTimeout(downloadFree(src), 120_000, "timeout");
+          } catch {
+            /* next one */
+          }
+        }
+        throw e;
+      },
+    );
+    if (!wantedTracks().has(track.id)) return;
+    await storeDownloaded(track, got);
+    useOffline.setState((s) => {
+      const failed = { ...s.failed };
+      delete failed[track.id];
+      return { failed };
+    });
+  } catch {
+    /* stays skipped, as always */
+  }
+}
+
+async function storeDownloaded(track: Track, { bytes, mime }: { bytes: Uint8Array; mime: string }) {
+  const file = encodeYtfy({ codec: "raw", mime, bytes });
+  const item: OfflineItem = {
+    id: track.id,
+    title: track.title,
+    artist: track.artist,
+    codec: "raw",
+    stored: file.length,
+    original: bytes.length,
+    bitrate: 0,
+    savedAt: Date.now(),
+    pendingCompress: canTranscode() && currentBitrate() > 0,
+  };
+  await putSong(item, file);
+  useOffline.setState((s) => ({ items: { ...s.items, [track.id]: item }, doneThisRun: s.doneThisRun + 1 }));
+}
+
 async function saveOne(track: Track) {
   const startedAt = Date.now();
   let job: ActiveJob = {
@@ -503,47 +732,14 @@ async function saveOne(track: Track) {
   update({});
   try {
     // The song's own video first; if that fails, up to two other uploads of the same song.
-    let result: { bytes: Uint8Array; mime: string } | null = null;
-    let lastError: Error = new Error("failed");
-    let sources: string[] = [track.id];
-    for (let n = 0; n < MAX_SOURCES && !result; n++) {
-      if (n === 1) sources = [track.id, ...(await alternativeSources(track))];
-      const source = sources[n];
-      if (!source) break;
-      update({ source: n + 1, received: 0, total: null, progress: 0, lastDataAt: Date.now(), note: n ? "alternative" : "resolving" });
-      try {
-        const got = await withTimeout(
-          downloadAudio(source, (done, total) =>
-            update({ received: done, total, progress: total ? Math.min(1, done / total) : 0, lastDataAt: Date.now(), note: undefined }),
-          ),
-          SONG_TIMEOUT_MS,
-          "timeout",
-        );
-        if (got.bytes.length) result = got;
-        else lastError = new Error("empty download");
-      } catch (e) {
-        lastError = e as Error;
-      }
-    }
-    if (!result) throw lastError;
-    const { bytes, mime } = result;
+    const got = await downloadFrom([track.id], update, { total: MAX_SOURCES }).catch(async (e) => {
+      const more = await alternativeSources(track);
+      if (!more.length) throw e;
+      return downloadFrom(more, update, { offset: 1, total: 1 + more.length });
+    });
     // Still wanted after the download? (It may have been removed from the playlist meanwhile.)
     if (!wantedTracks().has(track.id)) return;
-    // Stored as downloaded right away (playable offline now); the compression pass shrinks it afterwards.
-    const file = encodeYtfy({ codec: "raw", mime, bytes });
-    const item: OfflineItem = {
-      id: track.id,
-      title: track.title,
-      artist: track.artist,
-      codec: "raw",
-      stored: file.length,
-      original: bytes.length,
-      bitrate: 0,
-      savedAt: Date.now(),
-      pendingCompress: canTranscode() && currentBitrate() > 0,
-    };
-    await putSong(item, file);
-    useOffline.setState((s) => ({ items: { ...s.items, [track.id]: item }, doneThisRun: s.doneThisRun + 1 }));
+    await storeDownloaded(track, got);
   } catch (e) {
     const message = (e as Error).message || "failed";
     useOffline.setState((s) => ({

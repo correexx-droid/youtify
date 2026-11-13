@@ -3,7 +3,9 @@ import { useState } from "react";
 import { useNavigate } from "react-router";
 import { create } from "zustand";
 import { useT } from "../i18n";
-import { api, type LinkQuery } from "../lib/api";
+import { api, type LinkImport, type LinkQuery } from "../lib/api";
+import { decodeShare, findShareCode } from "../lib/shareCode";
+import { getT } from "../i18n";
 import { cn } from "../lib/format";
 import { paths } from "../lib/routes";
 import type { Track } from "../lib/types";
@@ -28,6 +30,8 @@ const songLinkCount = (text: string) => new Set([...text.matchAll(SPOTIFY_TRACK)
 const LINKS_KEY = "youtify:imported-links";
 
 function linkKey(url: string): string | null {
+  const code = findShareCode(url);
+  if (code) return `ytf:${code.length}:${code.slice(4, 60)}:${code.slice(-16)}`;
   const sp = /(playlist|album|track)[/:]([A-Za-z0-9]{10,40})/.exec(url);
   if (/spotify/.test(url) && sp && songLinkCount(url) < 2) return `spotify:${sp[1]}:${sp[2]}`;
   try {
@@ -57,6 +61,7 @@ function rememberLink(key: string, playlistId: string) {
 /** A Spotify playlist/album/track link, Spotify song links, or a YouTube link with a playlist in it (list=…). */
 export function isPlaylistLink(text: string): boolean {
   const s = text.trim();
+  if (findShareCode(s)) return true;
   if (songLinkCount(s) >= 2) return true;
   if (/(open\.spotify\.com\/(intl-[\w-]+\/)?(embed\/)?|spotify:)(playlist|album|track)[/:][A-Za-z0-9]{10,}/.test(s)) return true;
   try {
@@ -172,13 +177,21 @@ export const useImport = create<ImportState>((set, get) => ({
     if (!url || step === "reading" || step === "matching") return;
     set({ phase: { step: "reading" } });
     try {
-      const link = await api.readPlaylistLink(url);
+      const shared = decodeShare(url);
+      const link: LinkImport = shared
+        ? {
+            source: "youtube",
+            name: shared.name || getT().importLink.sharedSongs,
+            tracks: await api.tracksByIds(shared.ids),
+          }
+        : await api.readPlaylistLink(url);
+      if (shared) set({ phase: { step: "reading" } });
       let tracks: Track[];
       let total: number;
       const missing: string[] = [];
       if (link.source === "youtube") {
         tracks = link.tracks;
-        total = link.tracks.length;
+        total = shared ? shared.ids.length : link.tracks.length;
       } else {
         total = link.queries.length;
         set({ phase: { step: "matching", source: "spotify", name: link.name, done: 0, total } });
@@ -450,4 +463,11 @@ export function ImportPlaylistDialog() {
       </div>
     </Modal>
   );
+}
+
+// Shared YoutiFy links that opened the app (Android: youtify://share/…) start copying right away.
+if (typeof window !== "undefined") {
+  const pending = (globalThis as { __youtifyPendingShare?: string }).__youtifyPendingShare;
+  if (pending) setTimeout(() => copyPlaylistLink(pending), 1500);
+  window.addEventListener("youtify:open-share", (e) => copyPlaylistLink((e as CustomEvent<string>).detail));
 }

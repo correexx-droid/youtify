@@ -18,6 +18,17 @@ if (Capacitor.isNativePlatform()) {
     })
     .catch(() => {});
 
+  // YoutiFy share links (youtify://share/YTF1…) open the app: copy the playlist or songs they carry.
+  const openShare = (url?: string) => {
+    if (!url || !url.startsWith("youtify:")) return;
+    (globalThis as { __youtifyPendingShare?: string }).__youtifyPendingShare = url;
+    window.dispatchEvent(new CustomEvent("youtify:open-share", { detail: url }));
+  };
+  void App.getLaunchUrl()
+    .then((r) => openShare(r?.url))
+    .catch(() => {});
+  void App.addListener("appUrlOpen", (e) => openShare(e.url));
+
   // Back closes what's on top (a dialog, a menu), then goes back through pages, then sends the app to the
   // background, where the music keeps playing.
   void App.addListener("backButton", () => {

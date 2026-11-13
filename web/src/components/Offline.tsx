@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { useT } from "../i18n";
 import { cn, formatBytes } from "../lib/format";
+import { StorageLocation } from "./StorageLocation";
 import type { Track } from "../lib/types";
 import {
   collectionProgress,
@@ -196,6 +197,8 @@ export function OfflineSection() {
         <p className="text-xs text-fg-3">{t.offline.qualityNote}</p>
       </div>
 
+      <StorageLocation />
+
       <label className="flex cursor-pointer items-center justify-between gap-3 rounded-[16px] bg-surface-1 px-4 py-3 ring-1 ring-line">
         <span className="flex items-center gap-2 text-sm">
           <WifiHighIcon size={18} className="text-fg-2" /> {t.offline.wifiOnly}
@@ -374,7 +377,9 @@ export function DownloadsPanel() {
           <div className="flex flex-col gap-2 rounded-[16px] bg-surface-1 p-4 ring-1 ring-line">
             <p className="text-xs font-semibold tracking-[0.12em] text-accent-text uppercase">
               {a.phase === "download" ? t.offline.phaseDownloadTitle : t.offline.phaseCompressTitle}
-              {a.phase === "download" && (a.source ?? 1) > 1 && <span className="ml-2 normal-case">· {t.offline.source(a.source!)}</span>}
+              {a.phase === "download" && a.deep && <span className="ml-2 normal-case">· {t.offline.deepSearch}</span>}
+              {a.phase === "download" && (a.source ?? 1) > 1 && !a.deep && <span className="ml-2 normal-case">· {t.offline.source(a.source!, a.sources ?? 3)}</span>}
+              {a.phase === "download" && a.deep && a.source && <span className="ml-1 normal-case">{t.offline.source(a.source, a.sources ?? 10)}</span>}
             </p>
             <p className="truncate font-semibold">{a.title}</p>
             <span className="h-2 overflow-hidden rounded-full bg-surface-4">
@@ -385,7 +390,11 @@ export function DownloadsPanel() {
             </span>
             <p className="text-xs text-fg-2">
               {a.phase === "download"
-                ? (a.note === "resolving" || a.note === "alternative") && !a.received
+                ? a.note === "searching"
+                  ? t.offline.deepSearching
+                  : a.note?.startsWith("free:")
+                  ? t.offline.freeSource(a.note.slice(5))
+                  : (a.note === "resolving" || a.note === "alternative") && !a.received
                   ? a.note === "alternative"
                     ? t.offline.tryingAlternative
                     : t.offline.resolving

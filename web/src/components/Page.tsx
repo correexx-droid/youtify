@@ -1,4 +1,5 @@
-import { ArrowLeftIcon, GearSixIcon } from "@phosphor-icons/react";
+import { ArrowLeftIcon, GearSixIcon, UsersThreeIcon } from "@phosphor-icons/react";
+import { useJam } from "../lib/jam";
 import type { ReactNode } from "react";
 import { useNavigate } from "react-router";
 import { useT } from "../i18n";
@@ -38,6 +39,7 @@ export function PageHeader({
         {title && <h1 className="min-w-0 flex-1 truncate text-lg font-semibold tracking-tight md:text-xl">{title}</h1>}
         {!title && <span className="flex-1" />}
         {actions}
+        <JamHeaderButton />
         <IconButton
           label={attention ? t.nav.settingsUpdate : t.nav.settings}
           onClick={() => setSettingsOpen(true)}
@@ -48,6 +50,18 @@ export function PageHeader({
         </IconButton>
       </div>
     </header>
+  );
+}
+
+/** Phones: Jam session entry next to the settings button. */
+function JamHeaderButton() {
+  const t = useT();
+  const active = useJam((s) => !!s.hosting || !!s.joined);
+  const open = useJam((s) => s.setDialogOpen);
+  return (
+    <IconButton label={t.jam.title} onClick={() => open(true)} className={cn("md:hidden", active && "text-accent-text")}>
+      <UsersThreeIcon size={22} weight={active ? "fill" : "regular"} />
+    </IconButton>
   );
 }
 
